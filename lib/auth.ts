@@ -1,9 +1,9 @@
+// lib/auth.ts
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { prisma } from "./prisma";
 import GoogleProvider from "next-auth/providers/google";
 import GitHubProvider from "next-auth/providers/github";
 import { AuthOptions } from "next-auth";
-
 
 export const authOptions: AuthOptions = {
     adapter: PrismaAdapter(prisma),
@@ -18,14 +18,17 @@ export const authOptions: AuthOptions = {
         }),
     ],
     callbacks: {
-        async redirect({ baseUrl }) {
-            return `${baseUrl}/feed`; // redirect after login
+        async redirect({ url, baseUrl }) {
+            if (url.startsWith(baseUrl)) return url;
+            return `${baseUrl}/feed`;
         },
         async session({ session, user }) {
             return { ...session, user: { ...session.user, id: user.id } };
         },
     },
-    pages: { signIn: "/login" },
-    debug: true,
+    pages: {
+        signIn: "/login",
+    },
     secret: process.env.NEXTAUTH_SECRET,
+    debug: true,
 };

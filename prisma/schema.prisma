@@ -7,56 +7,50 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Account {
-  id                 String   @id @map("_id") @default(auto()) @db.ObjectId
-  userId             String   @db.ObjectId
-  type               String
-  provider           String
-  providerAccountId  String
-  refresh_token      String?
-  access_token       String?
-  expires_at         Int?
-  token_type         String?
-  scope              String?
-  id_token           String?
-  session_state      String?
+model User {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
 
-  user User @relation(fields: [userId], references: [id])
+  accounts Account[]
+  sessions Session[]
+  posts    Post[]
+}
+
+model Account {
+  id                String  @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String  @db.ObjectId
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@unique([provider, providerAccountId])
 }
 
 model Session {
-  id           String   @id @map("_id") @default(auto()) @db.ObjectId
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
   sessionToken String   @unique
   userId       String   @db.ObjectId
   expires      DateTime
-
-  user User @relation(fields: [userId], references: [id])
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Post {
-  id        String   @id @map("_id") @default(auto()) @db.ObjectId
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  title     String?
   content   String
-  image     String?
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  authorId  String   @db.ObjectId
-  author    User     @relation(fields: [authorId], references: [id])
-
-  likes     Int      @default(0)
-}
-
-model User {
-  id        String   @id @map("_id") @default(auto()) @db.ObjectId
-  name      String?
-  email     String?  @unique
-  username  String?  @unique
-  image     String?
-  bio       String?
-  createdAt DateTime @default(now())
-
-  posts     Post[]   // One-to-many relation with Post
-  accounts  Account[]
-  sessions  Session[]
 }

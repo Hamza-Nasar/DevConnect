@@ -5,31 +5,30 @@ export default function NewPostForm() {
     const [title, setTitle] = useState("");
     const [content, setContent] = useState("");
 
-    async function handleSubmit(e: React.FormEvent) {
+    // example in React
+    async function handleSubmit(e) {
         e.preventDefault();
 
         const res = await fetch("/api/posts", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ title, content }),
+            body: JSON.stringify({
+                title,
+                content,
+            }),
         });
 
         const data = await res.json();
-
         if (!res.ok) {
             alert("Error: " + data.error);
         } else {
-            console.log("✅ Post created:", data);
-            setTitle("");
-            setContent("");
-
-            // 🔄 Refresh posts in the UI without reloading the whole page
-            window.dispatchEvent(new Event("postCreated"));
+            console.log("Post created:", data);
         }
     }
 
+
     return (
-        <form onSubmit={handleSubmit} className="mb-4">
+        <form onSubmit={handleSubmit}>
             <input
                 type="text"
                 placeholder="Title"
@@ -43,12 +42,10 @@ export default function NewPostForm() {
                 onChange={(e) => setContent(e.target.value)}
                 className="w-full p-2 border rounded"
             />
-            <button
-                type="submit"
-                className="mt-2 bg-blue-500 text-white px-4 py-2 rounded"
-            >
+            <button type="submit" className="mt-2 bg-blue-500 text-white px-4 py-2 rounded">
                 Post
             </button>
         </form>
+
     );
 }
