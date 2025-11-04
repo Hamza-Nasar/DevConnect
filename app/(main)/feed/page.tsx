@@ -17,7 +17,7 @@ export default function FeedPage() {
     if (status === "loading") return <div>Loading...</div>;
 
     return (
-        <div className="min-h-screen bg-gray-900 text-white p-6">
+        <div className="min-h-screen bg-gray-800 text-white p-6">
             <h1 className="text-3xl font-bold mb-6">DevConnect Feed 🚀</h1>
 
             <CreatePost />
