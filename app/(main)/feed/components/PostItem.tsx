@@ -150,7 +150,14 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
       if (data.postId === post.id) {
         setCommentsCount(data.commentsCount);
         if (data.comment && showComments) {
-          setComments((prev) => [data.comment, ...prev]);
+          setComments((prev) => {
+            // Prevent duplicates - check if comment already exists
+            const commentId = data.comment.id || data.comment._id;
+            if (commentId && prev.some((c) => (c.id || c._id) === commentId)) {
+              return prev; // Comment already exists, don't add duplicate
+            }
+            return [data.comment, ...prev];
+          });
         }
       }
     });
@@ -351,7 +358,13 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
       const res = await fetch(`/api/comments?postId=${post.id}`);
       if (res.ok) {
         const data = await res.json();
-        setComments(data || []);
+        // Remove duplicates based on id or _id
+        const uniqueComments = (data || []).filter((comment: any, index: number, self: any[]) => {
+          const commentId = comment.id || comment._id;
+          if (!commentId) return true; // Keep comments without id (will use index as key)
+          return index === self.findIndex((c: any) => (c.id || c._id) === commentId);
+        });
+        setComments(uniqueComments);
       }
     } catch (error) {
       console.error("Error fetching comments:", error);
@@ -379,8 +392,13 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
       userId: session?.user?.id,
     };
 
-    // Optimistic update
-    setComments((prev) => [tempComment, ...prev]);
+    // Optimistic update - ensure no duplicates
+    setComments((prev) => {
+      // Check if temp comment already exists (shouldn't happen, but safety check)
+      const exists = prev.some((c) => c.id === tempId);
+      if (exists) return prev;
+      return [tempComment, ...prev];
+    });
     setCommentInput("");
     setCommentsCount((prev) => prev + 1);
 
@@ -988,13 +1006,20 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
               <p className="text-sm text-muted-foreground text-center py-4">No comments yet. Be the first to comment!</p>
             ) : (
               <div className="space-y-3 max-h-96 overflow-y-auto custom-scrollbar">
-                {comments.map((comment) => (
-                  <motion.div
-                    key={comment.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="flex gap-2"
-                  >
+                {comments.map((comment, index) => {
+                  // Generate unique key - always include index to ensure uniqueness
+                  const commentId = comment.id || comment._id;
+                  const uniqueKey = commentId 
+                    ? `${commentId}-${index}-${post.id}` 
+                    : `comment-${post.id}-${index}-${comment.createdAt || Date.now()}`;
+                  
+                  return (
+                    <motion.div
+                      key={uniqueKey}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="flex gap-2"
+                    >
                     <RealTimeAvatar
                       userId={comment.userId}
                       src={comment.user?.image || comment.user?.avatar}
@@ -1021,9 +1046,10 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
                           Delete
                         </button>
                       )}
-                    </div>
+                    </div>     
                   </motion.div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

@@ -174,12 +174,46 @@ export const authOptions: AuthOptions = {
             if (account?.provider === "google" && user?.email) {
                 try {
                     const { getCollection } = await import("./mongodb");
-                    const usersCollection = await getCollection("users");
+                    
+                    // Try to use new collection helpers, fallback to direct collection access
+                    let getUsersCollection: any;
+                    let createAccount: any;
+                    let findAccountByProvider: any;
+                    
+                    try {
+                        const dbCollections = await import("./db-collections");
+                        getUsersCollection = dbCollections.getUsersCollection;
+                        createAccount = dbCollections.createAccount;
+                        findAccountByProvider = dbCollections.findAccountByProvider;
+                    } catch (e) {
+                        // Fallback: use direct collection access
+                        console.warn("db-collections not available, using fallback");
+                        getUsersCollection = () => getCollection("users");
+                        createAccount = async (data: any) => {
+                            const accountsCollection = await getCollection("accounts");
+                            const result = await accountsCollection.insertOne({
+                                ...data,
+                                createdAt: new Date(),
+                                updatedAt: new Date(),
+                            });
+                            return accountsCollection.findOne({ _id: result.insertedId });
+                        };
+                        findAccountByProvider = async (provider: string, providerAccountId: string) => {
+                            const accountsCollection = await getCollection("accounts");
+                            return accountsCollection.findOne({ provider, providerAccountId });
+                        };
+                    }
+                    
+                    const usersCollection = await getUsersCollection();
 
                     // Check if user exists
                     const existingUser = await usersCollection.findOne({ email: user.email });
 
+                    let userId: string;
+
                     if (existingUser && !existingUser.username) {
+                        userId = existingUser._id.toString();
+                        
                         // Generate username from name or email
                         const baseUsername = user.name
                             ? user.name.toLowerCase().replace(/\s+/g, '')
@@ -219,7 +253,7 @@ export const authOptions: AuthOptions = {
                             counter++;
                         }
 
-                        await usersCollection.insertOne({
+                        const result = await usersCollection.insertOne({
                             email: user.email,
                             name: user.name,
                             username,
@@ -228,6 +262,61 @@ export const authOptions: AuthOptions = {
                             createdAt: new Date(),
                             updatedAt: new Date(),
                         });
+                        
+                        userId = result.insertedId.toString();
+                    } else {
+                        userId = existingUser._id.toString();
+                    }
+
+                    // Store OAuth account in separate accounts collection (optional - won't break if fails)
+                    if (account && userId) {
+                        try {
+                            const existingAccount = await findAccountByProvider(
+                                account.provider,
+                                account.providerAccountId
+                            );
+
+                            if (!existingAccount) {
+                                await createAccount({
+                                    userId,
+                                    type: account.type || "oauth",
+                                    provider: account.provider,
+                                    providerAccountId: account.providerAccountId,
+                                    access_token: account.access_token,
+                                    expires_at: account.expires_at,
+                                    token_type: account.token_type,
+                                    scope: account.scope,
+                                    id_token: account.id_token,
+                                    session_state: account.session_state,
+                                });
+                            } else {
+                                // Update existing account
+                                try {
+                                    const accountsCollection = await getCollection("accounts");
+                                    await accountsCollection.updateOne(
+                                        { _id: existingAccount._id },
+                                        {
+                                            $set: {
+                                                access_token: account.access_token,
+                                                expires_at: account.expires_at,
+                                                token_type: account.token_type,
+                                                scope: account.scope,
+                                                id_token: account.id_token,
+                                                session_state: account.session_state,
+                                                updatedAt: new Date(),
+                                            }
+                                        }
+                                    );
+                                } catch (updateError) {
+                                    console.warn("Could not update account:", updateError);
+                                    // Continue - account update is optional
+                                }
+                            }
+                        } catch (accountError) {
+                            // Account creation is optional - don't break auth flow
+                            console.warn("Could not create/update account in accounts collection:", accountError);
+                            // Auth will still work - user is created in users collection
+                        }
                     }
                 } catch (error) {
                     console.error("Error creating username for OAuth user:", error);

@@ -1,28 +1,49 @@
-// MongoDB database helper functions
+/**
+ * MongoDB Database Helper Functions
+ * 
+ * یہ file database operations کے لیے helper functions provide کرتی ہے
+ * 
+ * IMPORTANT: Data properly separated ہے:
+ * - users: User profiles اور basic info
+ * - accounts: OAuth accounts (Google, etc.) - الگ collection
+ * - posts: تمام posts
+ * - comments: تمام comments
+ * - likedposts: Post likes
+ * - sharedposts: Post shares
+ * - follows: User follows
+ * - notifications: User notifications
+ * - messages: Direct messages
+ * - groups: Groups
+ * - etc.
+ * 
+ * ہر collection الگ ہے تاکہ data review اور management آسان ہو
+ */
+
 export { getCollection, getDb } from "./mongodb";
 import { getCollection, getDb } from "./mongodb";
 import { ObjectId } from "mongodb";
 
-// Collection names
+// Collection names - ہر collection کا الگ نام
 export const COLLECTIONS = {
-  USERS: "users",
-  POSTS: "posts",
-  COMMENTS: "comments",
-  LIKES: "likedposts",
-  SHARES: "sharedposts",
-  FOLLOWS: "follows",
-  NOTIFICATIONS: "notifications",
-  ACCOUNTS: "accounts",
-  SESSIONS: "sessions",
-  STORIES: "stories",
-  POLLS: "polls",
-  POLL_VOTES: "pollvotes",
-  MESSAGES: "messages",
-  GROUPS: "groups",
-  GROUP_MEMBERS: "groupmembers",
-  GROUP_POSTS: "groupposts",
-  USER_SETTINGS: "usersettings",
-  PROFILE_VIEWS: "profileviews",
+  USERS: "users",              // User profiles
+  POSTS: "posts",              // Posts
+  COMMENTS: "comments",        // Comments on posts
+  LIKES: "likedposts",         // Post likes
+  SHARES: "sharedposts",       // Post shares
+  FOLLOWS: "follows",          // User follows
+  NOTIFICATIONS: "notifications", // Notifications
+  ACCOUNTS: "accounts",        // OAuth accounts (Google, etc.) - الگ collection
+  SESSIONS: "sessions",        // User sessions
+  STORIES: "stories",          // Stories
+  POLLS: "polls",              // Polls
+  POLL_VOTES: "pollvotes",     // Poll votes
+  MESSAGES: "messages",        // Direct messages
+  GROUPS: "groups",            // Groups
+  GROUP_MEMBERS: "groupmembers", // Group members
+  GROUP_POSTS: "groupposts",   // Group posts
+  USER_SETTINGS: "usersettings", // User settings
+  PROFILE_VIEWS: "profileviews", // Profile views
+  METADATA: "devconnect",        // Project metadata - تمام collections کی list
 } as const;
 
 // Helper to convert string ID to ObjectId
@@ -42,7 +63,8 @@ export function toStringId(id: ObjectId | string | undefined | null): string | n
   return id.toString();
 }
 
-// User helpers
+// ==================== USER HELPERS ====================
+// Users collection - صرف user profiles اور basic info
 export async function findUserByEmail(email: string) {
   const collection = await getCollection(COLLECTIONS.USERS);
   return collection.findOne({ email });
@@ -123,7 +145,8 @@ export async function updateUser(userId: string, updateData: any) {
   return collection.findOne({ _id });
 }
 
-// Post helpers
+// ==================== POST HELPERS ====================
+// Posts collection - تمام posts الگ collection میں
 export async function createPost(postData: any) {
   const collection = await getCollection(COLLECTIONS.POSTS);
   const result = await collection.insertOne({
@@ -173,7 +196,8 @@ export async function deletePost(postId: string) {
   return collection.deleteOne({ _id });
 }
 
-// Comment helpers
+// ==================== COMMENT HELPERS ====================
+// Comments collection - تمام comments الگ collection میں
 export async function createComment(commentData: any) {
   const collection = await getCollection(COLLECTIONS.COMMENTS);
   const result = await collection.insertOne({
@@ -190,7 +214,8 @@ export async function findCommentsByPostId(postId: string) {
   return collection.find({ postId: _id.toString() }).sort({ createdAt: -1 }).toArray();
 }
 
-// Like helpers
+// ==================== LIKE HELPERS ====================
+// Likes collection - تمام likes الگ collection میں
 export async function toggleLike(userId: string, postId: string) {
   const collection = await getCollection(COLLECTIONS.LIKES);
   const existing = await collection.findOne({
@@ -205,6 +230,7 @@ export async function toggleLike(userId: string, postId: string) {
     await collection.insertOne({
       userId: userId.toString(),
       postId: postId.toString(),
+      createdAt: new Date(),
     });
     return { liked: true };
   }
@@ -223,7 +249,8 @@ export async function countLikes(postId: string) {
   return collection.countDocuments({ postId: postId.toString() });
 }
 
-// Follow helpers
+// ==================== FOLLOW HELPERS ====================
+// Follows collection - تمام follows الگ collection میں
 export async function toggleFollow(followerId: string, followingId: string) {
   const collection = await getCollection(COLLECTIONS.FOLLOWS);
   const existing = await collection.findOne({
@@ -244,7 +271,8 @@ export async function toggleFollow(followerId: string, followingId: string) {
   }
 }
 
-// Share helpers
+// ==================== SHARE HELPERS ====================
+// Shares collection - تمام shares الگ collection میں
 export async function createShare(shareData: any) {
   const collection = await getCollection(COLLECTIONS.SHARES);
   const result = await collection.insertOne({
@@ -267,7 +295,8 @@ export async function countShares(postId: string) {
   return collection.countDocuments({ postId: postId.toString() });
 }
 
-// Notification helpers
+// ==================== NOTIFICATION HELPERS ====================
+// Notifications collection - تمام notifications الگ collection میں
 export async function createNotification(notificationData: any) {
   const collection = await getCollection(COLLECTIONS.NOTIFICATIONS);
   const result = await collection.insertOne({
