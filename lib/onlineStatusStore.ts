@@ -10,23 +10,32 @@ class OnlineStatusStore extends EventEmitter {
     }
 
     init() {
-        if (this.initialized) return;
         if (typeof window === "undefined") return;
 
         const socket = getSocket();
         if (!socket) return;
+
+        if (this.initialized) {
+            // If already initialized, just ensure we request data again if called
+            if (socket.connected) {
+                socket.emit("get_online_users");
+            }
+            return;
+        }
 
         this.initialized = true;
 
         // Listen for initial list
         socket.on("initial_online_users", (userIds: string[]) => {
             console.log("👥 [OnlineStatusStore] Received initial online users:", userIds.length);
+            this.onlineUsers.clear(); // Fresh start
             userIds.forEach(id => this.onlineUsers.add(id));
             this.emit("change");
         });
 
         // Listen for status changes
         socket.on("user_status", (data: { userId: string; status: string }) => {
+            console.log(`👤 [OnlineStatusStore] Status change: ${data.userId} -> ${data.status}`);
             if (data.status === "online") {
                 this.onlineUsers.add(data.userId);
             } else {
@@ -42,8 +51,18 @@ class OnlineStatusStore extends EventEmitter {
 
         // And on connect/reconnect
         socket.on("connect", () => {
+            console.log("🔄 [OnlineStatusStore] Socket connected, fetching status list");
             socket.emit("get_online_users");
         });
+    }
+
+    reconnect() {
+        this.onlineUsers.clear();
+        this.emit("change");
+        const socket = getSocket();
+        if (socket && socket.connected) {
+            socket.emit("get_online_users");
+        }
     }
 
     isUserOnline(userId?: string): boolean {

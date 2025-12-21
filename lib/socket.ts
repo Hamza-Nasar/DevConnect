@@ -13,16 +13,28 @@ export const getSocket = (): Socket | null => {
 
     socket = io(socketUrl, {
       path: "/socket.io-custom",
-      transports: ["polling", "websocket"],
+      transports: ["websocket", "polling"], // Prefer websocket
       reconnection: true,
-      reconnectionAttempts: 20,
+      reconnectionAttempts: Infinity, // Keep trying!
       reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000,
       withCredentials: true,
       autoConnect: true,
     });
 
+    let heartbeatInterval: NodeJS.Timeout;
+
     socket.on("connect", () => {
       console.log("✅ [Client] CONNECTED! Socket ID:", socket?.id);
+      
+      // Start heartbeat
+      if (heartbeatInterval) clearInterval(heartbeatInterval);
+      heartbeatInterval = setInterval(() => {
+        if (socket?.connected) {
+          socket.emit("ping_heartbeat");
+        }
+      }, 30000);
     });
 
     socket.on("connect_error", (error) => {
@@ -31,15 +43,44 @@ export const getSocket = (): Socket | null => {
 
     socket.on("disconnect", (reason) => {
       console.log("🔌 [Client] DISCONNECTED:", reason);
+      if (heartbeatInterval) clearInterval(heartbeatInterval);
+      
+      if (reason === "io server disconnect" || reason === "transport close") {
+        // the disconnection was initiated by the server, you need to reconnect manually
+        socket?.connect();
+      }
     });
+
+    // Handle visibility change to recover connection
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") {
+          console.log("👁️ [Client] Tab visible - checking socket connection");
+          if (socket && !socket.connected) {
+            socket.connect();
+          }
+        }
+      });
+    }
 
     // Debug: log ALL incoming events
     socket.onAny((eventName, ...args) => {
-      console.log(`📥 [Client] Received Event: ${eventName}`, args);
+      if (eventName !== "pong_heartbeat") { // reduce noise
+        console.log(`📥 [Client] Received Event: ${eventName}`, args);
+      }
     });
   }
 
   return socket;
+};
+
+export const reconnectSocket = () => {
+  if (socket) {
+    console.log("🔄 [Client] Force reconnecting...");
+    socket.disconnect().connect();
+  } else {
+    getSocket();
+  }
 };
 
 export const disconnectSocket = () => {

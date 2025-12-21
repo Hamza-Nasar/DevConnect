@@ -26,8 +26,8 @@ export function initializeSocket(server: HTTPServer) {
   io.on("connection", (socket) => {
     console.log(`🔌 [Server] New connection: ${socket.id}`);
 
-    socket.on("ping", () => {
-      socket.emit("pong");
+    socket.on("ping_heartbeat", () => {
+      socket.emit("pong_heartbeat");
     });
 
     socket.on("join", async (userId: string) => {
@@ -48,6 +48,7 @@ export function initializeSocket(server: HTTPServer) {
 
           // Normalize socket session ID to MongoDB _id
           (socket as any).userId = dbId;
+          (socket as any).oauthId = oauthId;
 
           if (!userSockets.has(dbId)) {
             userSockets.set(dbId, new Set());
@@ -59,38 +60,42 @@ export function initializeSocket(server: HTTPServer) {
           if (oauthId && oauthId !== dbId) {
             socket.join(`user:${oauthId}`);
           }
-          // Also join the room for the ID they actually passed to be safe
+
+          // Also join specific user ID passed to be safe
           if (userId !== dbId && userId !== oauthId) {
             socket.join(`user:${userId}`);
           }
 
-          console.log(`👤 [Server] User ${userId} (Primary: ${dbId}) joined rooms (Total sockets: ${userSockets.get(dbId)!.size})`);
+          console.log(`👤 [Server] User ${userId} (DB: ${dbId}, OAuth: ${oauthId}) joined rooms. Total sockets: ${userSockets.get(dbId)!.size}`);
 
-          // Mark online in DB
-          await usersCollection.updateOne(
-            { _id: user._id },
-            { $set: { isOnline: true, lastSeen: new Date() } }
-          );
+          // Mark online in DB if it was offline
+          if (!user.isOnline) {
+            await usersCollection.updateOne(
+              { _id: user._id },
+              { $set: { isOnline: true, lastSeen: new Date() } }
+            );
+          }
 
           // Broadcast status for BOTH IDs
           io.emit("user_status", { userId: dbId, status: "online", lastSeen: null });
           if (oauthId && oauthId !== dbId) {
             io.emit("user_status", { userId: oauthId, status: "online", lastSeen: null });
           }
-          console.log(`✅ [Server] User ${dbId} marked online`);
 
           // Send list of CURRENT online users to the joining user
           const onlineDbIds = Array.from(userSockets.keys());
           socket.emit("initial_online_users", onlineDbIds);
 
         } else {
-          // Fallback if user not found in DB yet
+          // Fallback if user not found in DB yet (rare but possible during first login)
           (socket as any).userId = userId;
           socket.join(`user:${userId}`);
           if (!userSockets.has(userId)) {
             userSockets.set(userId, new Set());
           }
           userSockets.get(userId)!.add(socket.id);
+
+          console.log(`👤 [Server] User ${userId} (Not in DB yet) joined rooms.`);
 
           await usersCollection.updateOne(
             { _id: userIdObj || userId as any },
@@ -110,6 +115,7 @@ export function initializeSocket(server: HTTPServer) {
 
     socket.on("get_online_users", () => {
       const onlineDbIds = Array.from(userSockets.keys());
+      console.log(`👥 [Server] Sending online users to ${socket.id}: ${onlineDbIds.length}`);
       socket.emit("initial_online_users", onlineDbIds);
     });
 
@@ -137,10 +143,10 @@ export function initializeSocket(server: HTTPServer) {
         avatar: data.avatar,
         isVideo: data.isVideo
       };
-      
+
       console.log(`📤 [Server] Emitting call_user event to room: ${receiverRoom}`, callData);
       io.to(receiverRoom).emit("call_user", callData);
-      
+
       // Also try emitting to all sockets in the room individually for debugging
       if (roomClients) {
         roomClients.forEach((socketId) => {
@@ -151,7 +157,7 @@ export function initializeSocket(server: HTTPServer) {
           }
         });
       }
-      
+
       console.log(`✅ [Server] Call event emitted to room: ${receiverRoom}`);
     });
 

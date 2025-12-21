@@ -171,7 +171,9 @@ export default function ChatPage() {
       setSocketStatus('connected');
       setSocketId(socket.id || null);
       if (session.user?.id) {
+        console.log("🔌 [Socket] Emitting join from onConnect for:", session.user.id);
         socket.emit("join", session.user.id);
+        hasJoinedRef.current = true;
       }
     };
 
