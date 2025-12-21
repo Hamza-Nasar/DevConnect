@@ -51,14 +51,8 @@ export default function Navbar() {
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [messages, setMessages] = useState(0);
-  const [userAvatar, setUserAvatar] = useState(session?.user?.image);
-
-  // Sync userAvatar with session image changes
-  useEffect(() => {
-    if (session?.user?.image) {
-      setUserAvatar(session.user.image);
-    }
-  }, [session?.user?.image]);
+  const [socketAvatar, setSocketAvatar] = useState<string | null>(null);
+  const userAvatar = socketAvatar || session?.user?.image;
 
   // Real-time updates (Avatar & Messages)
   useEffect(() => {
@@ -90,7 +84,7 @@ export default function Navbar() {
     // 2. Listen for avatar changes
     const handleAvatarChange = (data: { userId: string; avatar: string }) => {
       if (data.userId === userId) {
-        setUserAvatar(data.avatar);
+        setSocketAvatar(data.avatar);
         updateSession({
           user: { image: data.avatar },
         });

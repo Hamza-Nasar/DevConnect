@@ -646,7 +646,7 @@ export default function ChatPage() {
         const res = await fetch(`/api/users/${userId}`);
         if (res.ok) {
           const user = await res.json();
-          const newChat: Chat = {
+          const newChat: any = {
             id: `temp-${userId}`,
             userId: userId,
             user: {
@@ -672,7 +672,7 @@ export default function ChatPage() {
 
     // Always check on mount/updates, logic handles idempotency
     startChat();
-  }, [chats]); // Keeping chats dep to ensure we find existing ones if they load late
+  }, [chats, selectedChat?.userId]); // Including selectedChat?.userId to satisfy dependencies
 
   // Global Search Effect
   useEffect(() => {

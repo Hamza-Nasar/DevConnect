@@ -4,6 +4,7 @@ import getSocket from "./socket";
 class OnlineStatusStore extends EventEmitter {
     private onlineUsers: Set<string> = new Set();
     private initialized = false;
+    public connectionState: 'connected' | 'disconnected' | 'reconnecting' = 'disconnected';
 
     constructor() {
         super();
@@ -46,22 +47,37 @@ class OnlineStatusStore extends EventEmitter {
 
         // Request initial list immediately if socket connected
         if (socket.connected) {
+            this.connectionState = 'connected';
             socket.emit("get_online_users");
         }
 
         // And on connect/reconnect
         socket.on("connect", () => {
             console.log("🔄 [OnlineStatusStore] Socket connected, fetching status list");
+            this.connectionState = 'connected';
             socket.emit("get_online_users");
+            this.emit("change");
+        });
+
+        socket.on("disconnect", (reason) => {
+            console.log("🔌 [OnlineStatusStore] Socket disconnected:", reason);
+            this.connectionState = 'disconnected';
+            this.emit("change");
+        });
+
+        socket.on("reconnecting", () => {
+            this.connectionState = 'reconnecting';
+            this.emit("change");
         });
     }
 
     reconnect() {
         this.onlineUsers.clear();
+        this.connectionState = 'reconnecting';
         this.emit("change");
         const socket = getSocket();
-        if (socket && socket.connected) {
-            socket.emit("get_online_users");
+        if (socket) {
+            socket.connect();
         }
     }
 

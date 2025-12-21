@@ -1,8 +1,12 @@
 import { io, Socket } from "socket.io-client";
 
-let socket: Socket | null = null;
+interface CustomSocket extends Socket {
+  userId?: string;
+}
 
-export const getSocket = (): Socket | null => {
+let socket: CustomSocket | null = null;
+
+export const getSocket = (): CustomSocket | null => {
   if (typeof window === "undefined") return null;
 
   if (!socket) {
@@ -13,21 +17,34 @@ export const getSocket = (): Socket | null => {
 
     socket = io(socketUrl, {
       path: "/socket.io-custom",
-      transports: ["websocket", "polling"], // Prefer websocket
+      transports: ["polling", "websocket"], // Priority: Polling (more compatible with Vercel)
       reconnection: true,
-      reconnectionAttempts: Infinity, // Keep trying!
+      reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       timeout: 20000,
       withCredentials: true,
       autoConnect: true,
-    });
+    }) as CustomSocket;
+
+    // Diagnostics for Vercel debugging
+    if (typeof window !== "undefined") {
+      (window as any).SOCKET_DEBUG = {
+        socket,
+        config: { socketUrl, path: "/socket.io-custom" },
+        getStatus: () => ({
+          connected: socket?.connected,
+          id: socket?.id,
+          transport: (socket as any).io?.engine?.transport?.name
+        })
+      };
+    }
 
     let heartbeatInterval: NodeJS.Timeout;
 
     socket.on("connect", () => {
       console.log("✅ [Client] CONNECTED! Socket ID:", socket?.id);
-      
+
       // Start heartbeat
       if (heartbeatInterval) clearInterval(heartbeatInterval);
       heartbeatInterval = setInterval(() => {
@@ -44,7 +61,7 @@ export const getSocket = (): Socket | null => {
     socket.on("disconnect", (reason) => {
       console.log("🔌 [Client] DISCONNECTED:", reason);
       if (heartbeatInterval) clearInterval(heartbeatInterval);
-      
+
       if (reason === "io server disconnect" || reason === "transport close") {
         // the disconnection was initiated by the server, you need to reconnect manually
         socket?.connect();

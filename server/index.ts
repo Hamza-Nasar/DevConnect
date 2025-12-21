@@ -1,5 +1,10 @@
 import { Server as HTTPServer } from "http";
-import { Server as SocketIOServer } from "socket.io";
+import { Server as SocketIOServer, Socket } from "socket.io";
+
+interface CustomSocket extends Socket {
+  userId?: string;
+  oauthId?: string;
+}
 import { getCollection } from "../lib/mongodb";
 import { toObjectId, toStringId, COLLECTIONS } from "../lib/db";
 import { setSocketInstance } from "../lib/socket-server";
@@ -23,7 +28,7 @@ export function initializeSocket(server: HTTPServer) {
 
   console.log("🚀 Socket.IO Server Initialized");
 
-  io.on("connection", (socket) => {
+  io.on("connection", (socket: CustomSocket) => {
     console.log(`🔌 [Server] New connection: ${socket.id}`);
 
     socket.on("ping_heartbeat", () => {
@@ -47,8 +52,8 @@ export function initializeSocket(server: HTTPServer) {
           const oauthId = user.id;
 
           // Normalize socket session ID to MongoDB _id
-          (socket as any).userId = dbId;
-          (socket as any).oauthId = oauthId;
+          socket.userId = dbId;
+          socket.oauthId = oauthId;
 
           if (!userSockets.has(dbId)) {
             userSockets.set(dbId, new Set());
@@ -88,7 +93,7 @@ export function initializeSocket(server: HTTPServer) {
 
         } else {
           // Fallback if user not found in DB yet (rare but possible during first login)
-          (socket as any).userId = userId;
+          socket.userId = userId;
           socket.join(`user:${userId}`);
           if (!userSockets.has(userId)) {
             userSockets.set(userId, new Set());
@@ -98,7 +103,7 @@ export function initializeSocket(server: HTTPServer) {
           console.log(`👤 [Server] User ${userId} (Not in DB yet) joined rooms.`);
 
           await usersCollection.updateOne(
-            { _id: userIdObj || userId as any },
+            { _id: (userIdObj || userId) as unknown as any }, // Maintaining any here as it's the safest way to mix string/ObjectId for MongoDB Filter
             { $set: { isOnline: true, lastSeen: new Date() } },
             { upsert: false }
           );
@@ -120,7 +125,7 @@ export function initializeSocket(server: HTTPServer) {
     });
 
     // Video/Voice Call Signaling - UPDATED for avatar/video type
-    socket.on("call_user", (data: { userToCall: string; signalData: any; from: string; name: string; avatar: string; isVideo: boolean }) => {
+    socket.on("call_user", (data: { userToCall: string; signalData: unknown; from: string; name: string; avatar: string; isVideo: boolean }) => {
       const receiverRoom = `user:${data.userToCall}`;
       const roomClients = io.sockets.adapter.rooms.get(receiverRoom);
       const clientCount = roomClients ? roomClients.size : 0;
@@ -147,12 +152,11 @@ export function initializeSocket(server: HTTPServer) {
       console.log(`📤 [Server] Emitting call_user event to room: ${receiverRoom}`, callData);
       io.to(receiverRoom).emit("call_user", callData);
 
-      // Also try emitting to all sockets in the room individually for debugging
       if (roomClients) {
         roomClients.forEach((socketId) => {
-          const targetSocket = io.sockets.sockets.get(socketId);
+          const targetSocket = io.sockets.sockets.get(socketId) as CustomSocket;
           if (targetSocket) {
-            console.log(`📤 [Server] Emitting to socket: ${socketId}, userId: ${(targetSocket as any).userId}`);
+            console.log(`📤 [Server] Emitting to socket: ${socketId}, userId: ${targetSocket.userId}`);
             targetSocket.emit("call_user", callData);
           }
         });
@@ -161,7 +165,7 @@ export function initializeSocket(server: HTTPServer) {
       console.log(`✅ [Server] Call event emitted to room: ${receiverRoom}`);
     });
 
-    socket.on("answer_call", (data: { to: string; signal: any }) => {
+    socket.on("answer_call", (data: { to: string; signal: unknown }) => {
       console.log(`✅ Call answered, signal sent to ${data.to}`);
       io.to(`user:${data.to}`).emit("call_accepted", data.signal);
     });
@@ -281,8 +285,9 @@ export function initializeSocket(server: HTTPServer) {
           io.emit("new_post", postData);
 
           // Notify all followers specifically
-          followers.forEach((follow: any) => {
-            io.to(`user:${follow.followerId}`).emit("new_post", postData);
+          followers.forEach((follow: unknown) => {
+            const f = follow as { followerId: string };
+            io.to(`user:${f.followerId}`).emit("new_post", postData);
           });
 
           // Also notify the poster
@@ -508,7 +513,7 @@ export function initializeSocket(server: HTTPServer) {
     });
 
     // Handle profile update
-    socket.on("profile_updated", (data: { userId: string; profile: any }) => {
+    socket.on("profile_updated", (data: { userId: string; profile: unknown }) => {
       console.log(`👤 Profile updated for user ${data.userId}`);
       io.emit("profile_changed", {
         userId: data.userId,
@@ -543,7 +548,7 @@ export function initializeSocket(server: HTTPServer) {
     });
 
     // Handle new message (Direct Message)
-    socket.on("send_message", (data: { message: any; receiverId: string }) => {
+    socket.on("send_message", (data: { message: { senderId: string }; receiverId: string }) => {
       console.log(`💬 [Server] Message: ${data.message.senderId} → ${data.receiverId}`);
 
       // Emit to receiver
@@ -566,7 +571,7 @@ export function initializeSocket(server: HTTPServer) {
 
     // Handle typing (Direct Message)
     socket.on("typing", (data: { userId: string; isTyping: boolean }) => {
-      const senderId = (socket as any).userId;
+      const senderId = socket.userId;
       if (senderId) {
         io.to(`user:${data.userId}`).emit("typing", {
           userId: senderId,
@@ -579,7 +584,7 @@ export function initializeSocket(server: HTTPServer) {
     socket.on("disconnect", async () => {
       console.log("🔌 Client disconnected:", socket.id);
 
-      const userId = (socket as any).userId;
+      const userId = socket.userId;
       if (userId && userSockets.has(userId)) {
         const sockets = userSockets.get(userId)!;
         sockets.delete(socket.id);
@@ -617,7 +622,7 @@ export function initializeSocket(server: HTTPServer) {
             } else {
               // Fallback
               await usersCollection.updateOne(
-                { _id: userIdObj || userId as any },
+                { _id: (userIdObj || userId) as unknown as any },
                 { $set: { isOnline: false, lastSeen: lastSeen } }
               );
               io.emit("user_status", { userId, status: "offline", lastSeen });
