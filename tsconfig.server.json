@@ -7,10 +7,18 @@
     "allowSyntheticDefaultImports": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"]
-    }
+      "@/*": [
+        "./*"
+      ]
+    },
+    "allowImportingTsExtensions": true,
+    "noEmit": true
   },
-  "include": ["server.ts", "server/**/*.ts"],
-  "exclude": ["node_modules"]
+  "include": [
+    "server.ts",
+    "server/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
 }
-
