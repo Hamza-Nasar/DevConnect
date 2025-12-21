@@ -10,10 +10,10 @@ export const getSocket = (): CustomSocket | null => {
   if (typeof window === "undefined") return null;
 
   if (!socket) {
-    const origin = window.location.origin.replace(/\/$/, "");
+    const origin = typeof window !== "undefined" ? window.location.origin.replace(/\/$/, "") : "";
     const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || origin;
-    const isVercel = typeof window !== "undefined" && window.location.hostname.includes("vercel.app");
-    const isRailway = typeof window !== "undefined" && window.location.hostname.includes("railway.app");
+    const isVercel = typeof window !== "undefined" && window.location?.hostname?.includes("vercel.app");
+    const isRailway = typeof window !== "undefined" && window.location?.hostname?.includes("railway.app");
 
     if (isVercel && !process.env.NEXT_PUBLIC_SOCKET_URL) {
       console.warn("⚠️ [Client] Detected Vercel deployment without NEXT_PUBLIC_SOCKET_URL. Note that Vercel serverless functions cannot host Socket.io servers. If your server is on Railway, set NEXT_PUBLIC_SOCKET_URL to your Railway app URL.");
@@ -98,7 +98,7 @@ export const getSocket = (): CustomSocket | null => {
     if (process.env.NODE_ENV === "development") {
       socket.onAny((eventName, ...args) => {
         if (eventName !== "pong_heartbeat") { // reduce noise
-          console.log(`📥 [Client] Received Event: ${eventName}`, args);
+          console.log(`📥[Client] Received Event: ${eventName} `, args);
         }
       });
     }
