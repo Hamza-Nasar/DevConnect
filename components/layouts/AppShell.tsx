@@ -27,7 +27,7 @@ export function AppShell({
   return (
     <div className="min-h-screen bg-[rgb(var(--background))]">
       <Navbar />
-      
+
       <div className="flex pt-16">
         {/* Left Sidebar - Fixed Width */}
         {showLeftSidebar && (

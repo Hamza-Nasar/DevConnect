@@ -27,6 +27,7 @@ import {
   Music,
   MapPin,
   Gift,
+  ArrowLeft,
 } from "lucide-react";
 import Navbar from "@/components/navbar/Navbar";
 import { Card } from "@/components/ui/card";
@@ -144,6 +145,19 @@ export default function ChatPage() {
       currentUserIdRef.current = session.user.id;
     }
   }, [session?.user?.id]);
+
+  // Handle media stream attachment to video elements
+  useEffect(() => {
+    if (stream && myVideo.current) {
+      myVideo.current.srcObject = stream;
+    }
+  }, [stream, callActive, callAccepted]);
+
+  useEffect(() => {
+    if (otherUserStream && userVideo.current) {
+      userVideo.current.srcObject = otherUserStream;
+    }
+  }, [otherUserStream, callActive, callAccepted]);
 
   useEffect(() => {
     if (!session?.user?.id) return;
@@ -813,7 +827,17 @@ export default function ChatPage() {
         myVideo.current.srcObject = stream;
       }
 
-      const peer = new SimplePeer({ initiator: true, trickle: false, stream });
+      const peer = new SimplePeer({
+        initiator: true,
+        trickle: false,
+        stream,
+        config: {
+          iceServers: [
+            { urls: "stun:stun.l.google.com:19302" },
+            { urls: "stun:stun1.l.google.com:19302" }
+          ]
+        }
+      });
 
       peer.on("signal", (data: any) => {
         const socket = getSocket();
@@ -874,7 +898,17 @@ export default function ChatPage() {
       }
 
       console.log("📞 [Call] Creating peer connection...");
-      const peer = new SimplePeer({ initiator: false, trickle: false, stream });
+      const peer = new SimplePeer({
+        initiator: false,
+        trickle: false,
+        stream,
+        config: {
+          iceServers: [
+            { urls: "stun:stun.l.google.com:19302" },
+            { urls: "stun:stun1.l.google.com:19302" }
+          ]
+        }
+      });
 
       peer.on("signal", (data: any) => {
         console.log("📞 [Call] Peer signal generated, sending answer...");
@@ -1178,10 +1212,10 @@ export default function ChatPage() {
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
       <Navbar />
       <div className="pt-16 lg:pl-72 xl:pl-80">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-12rem)]">
+        <div className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 py-4 lg:py-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-8rem)] lg:h-[calc(100vh-12rem)]">
             {/* Chat List - Enhanced Design */}
-            <Card variant="elevated" className="lg:col-span-1 overflow-hidden flex flex-col">
+            <Card variant="elevated" className={`lg:col-span-1 overflow-hidden flex flex-col ${selectedChat ? "hidden lg:flex" : "flex"}`}>
               <div className="p-4 border-b border-gray-700/50 bg-gradient-to-r from-purple-600/10 to-blue-600/10">
                 <div className="flex items-center justify-between mb-4">
                   <div>
@@ -1326,54 +1360,64 @@ export default function ChatPage() {
             {/* Chat Window - Enhanced Design */}
             <Card
               variant="elevated"
-              className="lg:col-span-2 overflow-hidden flex flex-col"
+              className={`lg:col-span-2 overflow-hidden flex flex-col ${!selectedChat ? "hidden lg:flex" : "flex"}`}
             >
               {selectedChat ? (
                 <>
                   {/* Chat Header - Enhanced */}
                   <div className="p-4 border-b border-gray-700/50 bg-gradient-to-r from-purple-600/10 to-blue-600/10 flex items-center justify-between">
-                    <Link
-                      href={`/profile/${selectedChat.user.username || selectedChat.userId}`}
-                      className="flex items-center gap-3 hover:opacity-80 transition"
-                    >
-                      <RealTimeAvatar
-                        userId={selectedChat.user.id}
-                        src={selectedChat.user.avatar}
-                        alt={selectedChat.user.name || "User"}
-                        size="md"
-                        status={selectedChat.user.status || "offline"}
-                        alternativeIds={selectedChat.user.alternativeIds}
-                      />
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-semibold text-foreground">
-                            {selectedChat.user.name || "Unknown"}
-                          </h3>
-                          {selectedChat.user.verified && (
-                            <Badge variant="success" className="text-xs">Verified</Badge>
-                          )}
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setSelectedChat(null)}
+                        className="lg:hidden"
+                      >
+                        <ArrowLeft className="h-5 w-5" />
+                      </Button>
+                      <Link
+                        href={`/profile/${selectedChat.user.username || selectedChat.userId}`}
+                        className="flex items-center gap-3 hover:opacity-80 transition"
+                      >
+                        <RealTimeAvatar
+                          userId={selectedChat.user.id}
+                          src={selectedChat.user.avatar}
+                          alt={selectedChat.user.name || "User"}
+                          size="md"
+                          status={selectedChat.user.status || "offline"}
+                          alternativeIds={selectedChat.user.alternativeIds}
+                        />
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold text-foreground">
+                              {selectedChat.user.name || "Unknown"}
+                            </h3>
+                            {selectedChat.user.verified && (
+                              <Badge variant="success" className="text-xs">Verified</Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div
+                              className={`w-2 h-2 rounded-full ${selectedChat.user.status === "online"
+                                ? "bg-green-500 animate-pulse"
+                                : selectedChat.user.status === "away"
+                                  ? "bg-yellow-500"
+                                  : "bg-muted-foreground"
+                                }`}
+                            />
+                            <p className="text-sm text-muted-foreground">
+                              {selectedChat.user.status === "online"
+                                ? "Online"
+                                : selectedChat.user.status === "away"
+                                  ? "Away"
+                                  : selectedChat.user.lastSeen
+                                    ? `Last seen ${formatTimeAgo(selectedChat.user.lastSeen)}`
+                                    : "Offline"}
+                            </p>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <div
-                            className={`w-2 h-2 rounded-full ${selectedChat.user.status === "online"
-                              ? "bg-green-500 animate-pulse"
-                              : selectedChat.user.status === "away"
-                                ? "bg-yellow-500"
-                                : "bg-muted-foreground"
-                              }`}
-                          />
-                          <p className="text-sm text-muted-foreground">
-                            {selectedChat.user.status === "online"
-                              ? "Online"
-                              : selectedChat.user.status === "away"
-                                ? "Away"
-                                : selectedChat.user.lastSeen
-                                  ? `Last seen ${formatTimeAgo(selectedChat.user.lastSeen)}`
-                                  : "Offline"}
-                          </p>
-                        </div>
-                      </div>
-                    </Link>
+                      </Link>
+                    </div>
                     <div className="flex items-center gap-2">
                       <Button
                         variant="ghost"
@@ -1423,7 +1467,7 @@ export default function ChatPage() {
                             className={`flex ${isOwn ? "justify-end" : "justify-start"} ${showTime ? "mb-4" : ""
                               }`}
                           >
-                            <div className={`flex items-end gap-2 max-w-[75%] ${isOwn ? "flex-row-reverse" : "flex-row"}`}>
+                            <div className={`flex items-end gap-2 max-w-[85%] lg:max-w-[75%] ${isOwn ? "flex-row-reverse" : "flex-row"}`}>
                               {showAvatar && !isOwn && (
                                 <RealTimeAvatar
                                   userId={message.sender?.id}
