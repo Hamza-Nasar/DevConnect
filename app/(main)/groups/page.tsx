@@ -189,9 +189,9 @@ export default function GroupsPage() {
                 </h1>
                 <p className="text-sm sm:text-base text-gray-400">Join communities and connect with like-minded people</p>
               </div>
-              <Button variant="primary" onClick={() => setShowCreateModal(true)} className="w-full sm:w-auto">
-                <Plus className="h-4 w-4 mr-2" />
-                Create Group
+              <Button variant="primary" onClick={() => setShowCreateModal(true)} className="w-full sm:w-auto text-sm sm:text-base">
+                <Plus className="h-4 w-4 mr-1.5 sm:mr-2 flex-shrink-0" />
+                <span className="truncate">Create Group</span>
               </Button>
             </div>
 

@@ -248,22 +248,22 @@ function RegisterContent() {
     };
 
     return (
-        <div className="flex items-center justify-center min-h-screen bg-background p-4">
-            <Card variant="elevated" className="bg-card backdrop-blur-sm shadow-2xl rounded-2xl p-8 w-full max-w-md border-border">
+        <div className="flex items-center justify-center min-h-screen bg-background p-3 sm:p-4">
+            <Card variant="elevated" className="bg-card backdrop-blur-sm shadow-2xl rounded-xl sm:rounded-2xl p-4 sm:p-6 lg:p-8 w-full max-w-md border-border">
                 {/* Header */}
-                <div className="text-center mb-8">
-                    <div className="flex items-center justify-center mb-4">
+                <div className="text-center mb-6 sm:mb-8">
+                    <div className="flex items-center justify-center mb-3 sm:mb-4">
                         <div className="relative">
                             <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg blur opacity-75"></div>
-                            <div className="relative bg-gradient-to-r from-purple-600 to-blue-600 p-3 rounded-lg">
-                                <Zap className="h-8 w-8 text-white" />
+                            <div className="relative bg-gradient-to-r from-purple-600 to-blue-600 p-2 sm:p-3 rounded-lg">
+                                <Zap className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
                             </div>
                         </div>
                     </div>
-                    <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+                    <h1 className="text-2xl sm:text-3xl font-bold mb-1.5 sm:mb-2 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
                         DevConnect
                     </h1>
-                    <p className="text-muted-foreground">Create your account</p>
+                    <p className="text-sm sm:text-base text-muted-foreground">Create your account</p>
                 </div>
 
                 {/* Error Message */}
@@ -273,24 +273,24 @@ function RegisterContent() {
                             initial={{ opacity: 0, y: -10 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -10 }}
-                            className="mb-4 p-3 bg-destructive/10 border border-destructive/50 rounded-lg text-destructive text-sm flex items-center gap-2"
+                            className="mb-3 sm:mb-4 p-2.5 sm:p-3 bg-destructive/10 border border-destructive/50 rounded-lg text-destructive text-xs sm:text-sm flex items-start gap-2"
                         >
-                            <X className="h-4 w-4 flex-shrink-0" />
-                            <span>{error}</span>
+                            <X className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                            <span className="break-words">{error}</span>
                         </motion.div>
                     )}
                 </AnimatePresence>
 
                 {/* Signup Method Selector */}
                 {step === "input" && (
-                    <div className="mb-6">
-                        <div className="grid grid-cols-3 gap-2 mb-6">
+                    <div className="mb-4 sm:mb-6">
+                        <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mb-4 sm:mb-6">
                             <button
                                 onClick={() => {
                                     setSignupMethod("google");
                                     setError(null);
                                 }}
-                                className={`px-3 py-2 rounded-lg text-sm font-medium transition ${signupMethod === "google"
+                                className={`px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition ${signupMethod === "google"
                                     ? "bg-primary text-primary-foreground"
                                     : "bg-secondary text-muted-foreground hover:bg-secondary/80"
                                     }`}
@@ -302,7 +302,7 @@ function RegisterContent() {
                                     setSignupMethod("email");
                                     setError(null);
                                 }}
-                                className={`px-3 py-2 rounded-lg text-sm font-medium transition ${signupMethod === "email"
+                                className={`px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition ${signupMethod === "email"
                                     ? "bg-primary text-primary-foreground"
                                     : "bg-secondary text-muted-foreground hover:bg-secondary/80"
                                     }`}
@@ -314,7 +314,7 @@ function RegisterContent() {
                                     setSignupMethod("phone");
                                     setError(null);
                                 }}
-                                className={`px-3 py-2 rounded-lg text-sm font-medium transition ${signupMethod === "phone"
+                                className={`px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition ${signupMethod === "phone"
                                     ? "bg-primary text-primary-foreground"
                                     : "bg-secondary text-muted-foreground hover:bg-secondary/80"
                                     }`}
@@ -330,22 +330,22 @@ function RegisterContent() {
                                     onClick={handleGoogleSignUp}
                                     disabled={isLoading}
                                     variant="primary"
-                                    className="w-full py-6 text-base font-semibold"
+                                    className="w-full py-4 sm:py-6 text-sm sm:text-base font-semibold"
                                 >
                                     {isLoading ? (
                                         <>
-                                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                                            Connecting...
+                                            <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-b-2 border-white mr-2"></div>
+                                            <span>Connecting...</span>
                                         </>
                                     ) : (
                                         <>
-                                            <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
+                                            <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-2 flex-shrink-0" viewBox="0 0 24 24">
                                                 <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
                                                 <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
                                                 <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
                                                 <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
                                             </svg>
-                                            Sign up with Google
+                                            <span className="truncate">Sign up with Google</span>
                                         </>
                                     )}
                                 </Button>
@@ -354,60 +354,60 @@ function RegisterContent() {
 
                         {/* Email Signup */}
                         {signupMethod === "email" && (
-                            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+                            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3 sm:space-y-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-muted-foreground mb-2">Full Name</label>
+                                    <label className="block text-xs sm:text-sm font-medium text-muted-foreground mb-1.5 sm:mb-2">Full Name</label>
                                     <div className="relative">
-                                        <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                                        <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
                                         <Input
                                             type="text"
                                             placeholder="Enter your name"
                                             value={name}
                                             onChange={(e) => setName(e.target.value)}
-                                            className="pl-10 bg-secondary/50 border-input"
+                                            className="pl-9 sm:pl-10 text-sm sm:text-base bg-secondary/50 border-input h-10 sm:h-11"
                                         />
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-muted-foreground mb-2">Username</label>
+                                    <label className="block text-xs sm:text-sm font-medium text-muted-foreground mb-1.5 sm:mb-2">Username</label>
                                     <Input
                                         type="text"
                                         placeholder="username"
                                         value={username}
                                         onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/\s/g, ""))}
-                                        className="bg-secondary/50 border-input"
+                                        className="text-sm sm:text-base bg-secondary/50 border-input h-10 sm:h-11"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-muted-foreground mb-2">Email</label>
+                                    <label className="block text-xs sm:text-sm font-medium text-muted-foreground mb-1.5 sm:mb-2">Email</label>
                                     <div className="relative">
-                                        <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                                        <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
                                         <Input
                                             type="email"
                                             placeholder="Enter your email"
                                             value={email}
                                             onChange={(e) => setEmail(e.target.value)}
-                                            className="pl-10 bg-secondary/50 border-input"
+                                            className="pl-9 sm:pl-10 text-sm sm:text-base bg-secondary/50 border-input h-10 sm:h-11"
                                         />
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-muted-foreground mb-2">Password</label>
+                                    <label className="block text-xs sm:text-sm font-medium text-muted-foreground mb-1.5 sm:mb-2">Password</label>
                                     <div className="relative">
-                                        <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                                        <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
                                         <Input
                                             type={showPassword ? "text" : "password"}
                                             placeholder="Create a password"
                                             value={password}
                                             onChange={(e) => setPassword(e.target.value)}
-                                            className="pl-10 pr-10 bg-secondary/50 border-input"
+                                            className="pl-9 sm:pl-10 pr-9 sm:pr-10 text-sm sm:text-base bg-secondary/50 border-input h-10 sm:h-11"
                                         />
                                         <button
                                             type="button"
                                             onClick={() => setShowPassword(!showPassword)}
                                             className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
                                         >
-                                            {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                                            {showPassword ? <EyeOff className="h-4 w-4 sm:h-5 sm:w-5" /> : <Eye className="h-4 w-4 sm:h-5 sm:w-5" />}
                                         </button>
                                     </div>
                                 </div>
@@ -415,7 +415,7 @@ function RegisterContent() {
                                     onClick={handleEmailSignup}
                                     disabled={isLoading}
                                     variant="primary"
-                                    className="w-full"
+                                    className="w-full text-sm sm:text-base"
                                 >
                                     {isLoading ? "Creating account..." : "Create Account"}
                                 </Button>
@@ -424,49 +424,49 @@ function RegisterContent() {
 
                         {/* Phone Signup */}
                         {signupMethod === "phone" && (
-                            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+                            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3 sm:space-y-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-muted-foreground mb-2">Full Name</label>
+                                    <label className="block text-xs sm:text-sm font-medium text-muted-foreground mb-1.5 sm:mb-2">Full Name</label>
                                     <div className="relative">
-                                        <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                                        <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
                                         <Input
                                             type="text"
                                             placeholder="Enter your name"
                                             value={name}
                                             onChange={(e) => setName(e.target.value)}
-                                            className="pl-10 bg-secondary/50 border-input"
+                                            className="pl-9 sm:pl-10 text-sm sm:text-base bg-secondary/50 border-input h-10 sm:h-11"
                                         />
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-muted-foreground mb-2">Username</label>
+                                    <label className="block text-xs sm:text-sm font-medium text-muted-foreground mb-1.5 sm:mb-2">Username</label>
                                     <Input
                                         type="text"
                                         placeholder="username"
                                         value={username}
                                         onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/\s/g, ""))}
-                                        className="bg-secondary/50 border-input"
+                                        className="text-sm sm:text-base bg-secondary/50 border-input h-10 sm:h-11"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-muted-foreground mb-2">Phone Number</label>
+                                    <label className="block text-xs sm:text-sm font-medium text-muted-foreground mb-1.5 sm:mb-2">Phone Number</label>
                                     <div className="relative">
-                                        <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                                        <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
                                         <Input
                                             type="tel"
                                             placeholder="+1234567890"
                                             value={phone}
                                             onChange={(e) => setPhone(e.target.value)}
-                                            className="pl-10 bg-secondary/50 border-input"
+                                            className="pl-9 sm:pl-10 text-sm sm:text-base bg-secondary/50 border-input h-10 sm:h-11"
                                         />
                                     </div>
-                                    <p className="text-xs text-muted-foreground mt-1">Include country code (e.g., +1 for US)</p>
+                                    <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">Include country code (e.g., +1 for US)</p>
                                 </div>
                                 <Button
                                     onClick={handlePhoneSignup}
                                     disabled={isLoading || !name || !username || !phone}
                                     variant="primary"
-                                    className="w-full"
+                                    className="w-full text-sm sm:text-base"
                                 >
                                     {isLoading ? "Sending OTP..." : "Send OTP"}
                                 </Button>
@@ -480,30 +480,30 @@ function RegisterContent() {
                     <motion.div
                         initial={{ opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
-                        className="space-y-4"
+                        className="space-y-3 sm:space-y-4"
                     >
-                        <div className="text-center mb-4">
-                            <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-2" />
-                            <p className="text-foreground font-medium">OTP Sent!</p>
-                            <p className="text-sm text-muted-foreground">Enter the 6-digit code sent to your phone</p>
+                        <div className="text-center mb-3 sm:mb-4">
+                            <CheckCircle className="h-10 w-10 sm:h-12 sm:w-12 text-green-500 mx-auto mb-2" />
+                            <p className="text-foreground font-medium text-sm sm:text-base">OTP Sent!</p>
+                            <p className="text-xs sm:text-sm text-muted-foreground">Enter the 6-digit code sent to your phone</p>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-muted-foreground mb-2">Enter OTP</label>
+                            <label className="block text-xs sm:text-sm font-medium text-muted-foreground mb-1.5 sm:mb-2">Enter OTP</label>
                             <Input
                                 type="text"
                                 placeholder="000000"
                                 value={otp}
                                 onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                                className="text-center text-2xl tracking-widest bg-secondary/50 border-input"
+                                className="text-center text-xl sm:text-2xl tracking-widest bg-secondary/50 border-input h-12 sm:h-14"
                                 maxLength={6}
                             />
                             {otpTimer > 0 && (
-                                <p className="text-xs text-muted-foreground mt-2 text-center">
+                                <p className="text-[10px] sm:text-xs text-muted-foreground mt-2 text-center">
                                     Resend OTP in {Math.floor(otpTimer / 60)}:{(otpTimer % 60).toString().padStart(2, "0")}
                                 </p>
                             )}
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex flex-col sm:flex-row gap-2">
                             <Button
                                 onClick={() => {
                                     setStep("input");
@@ -511,7 +511,7 @@ function RegisterContent() {
                                     setOtpSent(false);
                                 }}
                                 variant="outline"
-                                className="flex-1"
+                                className="flex-1 text-sm sm:text-base"
                             >
                                 Back
                             </Button>
@@ -519,7 +519,7 @@ function RegisterContent() {
                                 onClick={handleVerifyOTPAndSignup}
                                 disabled={isLoading || otp.length !== 6}
                                 variant="primary"
-                                className="flex-1"
+                                className="flex-1 text-sm sm:text-base"
                             >
                                 {isLoading ? "Creating..." : "Verify & Create"}
                             </Button>
@@ -528,14 +528,14 @@ function RegisterContent() {
                 )}
 
                 {/* Footer */}
-                <div className="mt-6 text-center">
-                    <p className="text-xs text-muted-foreground mb-2">
+                <div className="mt-4 sm:mt-6 text-center">
+                    <p className="text-[10px] sm:text-xs text-muted-foreground mb-1.5 sm:mb-2 break-words">
                         Already have an account?{" "}
                         <a href="/login" className="text-primary hover:text-primary/80">
                             Sign in
                         </a>
                     </p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-[10px] sm:text-xs text-muted-foreground break-words px-2">
                         By signing up, you agree to our{" "}
                         <a href="#" className="text-primary hover:text-primary/80">Terms of Service</a>{" "}
                         and <a href="#" className="text-primary hover:text-primary/80">Privacy Policy</a>

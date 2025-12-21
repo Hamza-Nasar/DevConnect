@@ -549,10 +549,10 @@ export default function SettingsPage() {
                     variant="primary"
                     onClick={handleSaveProfile}
                     disabled={loading}
-                    className="w-full"
+                    className="w-full text-sm sm:text-base"
                   >
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Changes
+                    <Save className="h-4 w-4 mr-1.5 sm:mr-2 flex-shrink-0" />
+                    <span>Save Changes</span>
                   </Button>
                 </div>
               </Card>
@@ -642,10 +642,10 @@ export default function SettingsPage() {
                     variant="primary"
                     onClick={handleSavePrivacy}
                     disabled={loading}
-                    className="w-full"
+                    className="w-full text-sm sm:text-base"
                   >
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Privacy Settings
+                    <Save className="h-4 w-4 mr-1.5 sm:mr-2 flex-shrink-0" />
+                    <span className="truncate">Save Privacy Settings</span>
                   </Button>
                 </div>
               </Card>
@@ -737,10 +737,10 @@ export default function SettingsPage() {
                     variant="primary"
                     onClick={handleSaveNotifications}
                     disabled={loading}
-                    className="w-full"
+                    className="w-full text-sm sm:text-base"
                   >
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Notification Settings
+                    <Save className="h-4 w-4 mr-1.5 sm:mr-2 flex-shrink-0" />
+                    <span className="truncate">Save Notification Settings</span>
                   </Button>
                 </div>
               </Card>

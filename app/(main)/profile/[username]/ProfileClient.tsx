@@ -192,16 +192,27 @@ export default function ProfileClient({
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
       <Navbar />
       <div className="pt-16 lg:pl-72 xl:pl-80">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="max-w-6xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8">
           {/* Profile Header */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
-            <Card variant="elevated" className="p-8 mb-6">
-              <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
-                <div className="relative">
+            <Card variant="elevated" className="p-4 sm:p-6 lg:p-8 mb-4 sm:mb-6 relative">
+              {/* Settings Button - Top Right */}
+              {isOwnProfile && (
+                <div className="absolute top-4 right-4 sm:top-6 sm:right-6">
+                  <Link href="/settings">
+                    <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-10 sm:w-10 hover:bg-gray-800/50">
+                      <Settings className="h-4 w-4 sm:h-5 sm:w-5" />
+                    </Button>
+                  </Link>
+                </div>
+              )}
+              
+              <div className="flex flex-col md:flex-row items-start md:items-center gap-4 sm:gap-6">
+                <div className="relative flex-shrink-0 mx-auto md:mx-0">
                   <RealTimeAvatar
                     userId={user.id}
                     src={userAvatar}
@@ -210,59 +221,52 @@ export default function ProfileClient({
                     status="offline"
                   />
                   {user.verified && (
-                    <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center border-4 border-gray-900">
-                      <span className="text-white text-lg">✓</span>
+                    <div className="absolute -bottom-1 -right-1 sm:-bottom-2 sm:-right-2 w-8 h-8 sm:w-10 sm:h-10 bg-blue-500 rounded-full flex items-center justify-center border-2 sm:border-4 border-gray-900">
+                      <span className="text-white text-sm sm:text-lg">✓</span>
                     </div>
                   )}
                 </div>
 
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h1 className="text-3xl font-bold text-white">{userName}</h1>
+                <div className="flex-1 w-full min-w-0 pr-8 sm:pr-12">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-2">
+                    <h1 className="text-2xl sm:text-3xl font-bold text-white truncate">{userName}</h1>
                     {user.verified && (
-                      <Badge variant="success" className="flex items-center gap-1">
-                        <Star className="h-3 w-3" />
+                      <Badge variant="success" className="flex items-center gap-1 text-xs sm:text-sm flex-shrink-0">
+                        <Star className="h-3 w-3 flex-shrink-0" />
                         Verified
                       </Badge>
                     )}
-                    {isOwnProfile && (
-                      <Link href="/settings">
-                        <Button variant="ghost" size="icon">
-                          <Settings className="h-5 w-5" />
-                        </Button>
-                      </Link>
-                    )}
                   </div>
-                  <p className="text-gray-400 mb-4">@{user.username || user.id}</p>
+                  <p className="text-sm sm:text-base text-gray-400 mb-3 sm:mb-4 truncate">@{user.username || user.id}</p>
 
                   {user.bio && (
-                    <p className="text-gray-300 mb-4">{user.bio}</p>
+                    <p className="text-sm sm:text-base text-gray-300 mb-3 sm:mb-4 break-words">{user.bio}</p>
                   )}
 
                   {/* Badges & Achievements */}
                   {(badges.length > 0 || achievements.length > 0) && (
-                    <div className="flex flex-wrap gap-2 mb-4">
+                    <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-3 sm:mb-4">
                       {badges.map((badge, idx) => (
-                        <Badge key={idx} variant="primary" className="flex items-center gap-1">
-                          <Award className="h-3 w-3" />
-                          {badge}
+                        <Badge key={idx} variant="primary" className="flex items-center gap-1 text-xs sm:text-sm">
+                          <Award className="h-3 w-3 flex-shrink-0" />
+                          <span className="truncate">{badge}</span>
                         </Badge>
                       ))}
                       {achievements.map((achievement, idx) => (
-                        <Badge key={idx} variant="success" className="flex items-center gap-1">
-                          <Trophy className="h-3 w-3" />
-                          {achievement}
+                        <Badge key={idx} variant="success" className="flex items-center gap-1 text-xs sm:text-sm">
+                          <Trophy className="h-3 w-3 flex-shrink-0" />
+                          <span className="truncate">{achievement}</span>
                         </Badge>
                       ))}
                     </div>
                   )}
 
                   {/* Location & Website */}
-                  <div className="flex flex-wrap items-center gap-4 text-sm text-gray-400 mb-4">
+                  <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-400 mb-3 sm:mb-4">
                     {user.location && (
                       <div className="flex items-center gap-1">
-                        <MapPin className="h-4 w-4" />
-                        <span>{user.location}</span>
+                        <MapPin className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                        <span className="truncate">{user.location}</span>
                       </div>
                     )}
                     {user.website && (
@@ -270,78 +274,84 @@ export default function ProfileClient({
                         href={user.website}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-1 hover:text-blue-400 transition"
+                        className="flex items-center gap-1 hover:text-blue-400 transition truncate"
                       >
-                        <Globe className="h-4 w-4" />
-                        <span>{user.website.replace(/^https?:\/\//, "")}</span>
+                        <Globe className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                        <span className="truncate">{user.website.replace(/^https?:\/\//, "")}</span>
                       </a>
                     )}
                     <div className="flex items-center gap-1">
-                      <Calendar className="h-4 w-4" />
-                      <span>Joined {new Date(user.createdAt).toLocaleDateString("en-US", { month: "long", year: "numeric" })}</span>
+                      <Calendar className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                      <span className="truncate">Joined {new Date(user.createdAt).toLocaleDateString("en-US", { month: "long", year: "numeric" })}</span>
                     </div>
                   </div>
 
                   {/* Skills */}
                   {user.skills && user.skills.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mb-4">
+                    <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-3 sm:mb-4">
                       {user.skills.map((skill, idx) => (
-                        <Badge key={idx} variant="outline" className="flex items-center gap-1">
-                          <Code className="h-3 w-3" />
-                          {skill}
+                        <Badge key={idx} variant="outline" className="flex items-center gap-1 text-xs sm:text-sm">
+                          <Code className="h-3 w-3 flex-shrink-0" />
+                          <span className="truncate">{skill}</span>
                         </Badge>
                       ))}
                     </div>
                   )}
 
                   {/* Stats */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 mb-3 sm:mb-4">
                     <Link href={`/profile/${user.username || user.id}/followers`} className="hover:opacity-80 transition">
-                      <Card variant="default" className="p-4 text-center">
-                        <div className="text-2xl font-bold text-white">{formatNumber(followersCount)}</div>
-                        <div className="text-sm text-gray-400">Followers</div>
+                      <Card variant="default" className="p-3 sm:p-4 text-center">
+                        <div className="text-xl sm:text-2xl font-bold text-white">{formatNumber(followersCount)}</div>
+                        <div className="text-xs sm:text-sm text-gray-400">Followers</div>
                       </Card>
                     </Link>
                     <Link href={`/profile/${user.username || user.id}/following`} className="hover:opacity-80 transition">
-                      <Card variant="default" className="p-4 text-center">
-                        <div className="text-2xl font-bold text-white">{formatNumber(followingCount)}</div>
-                        <div className="text-sm text-gray-400">Following</div>
+                      <Card variant="default" className="p-3 sm:p-4 text-center">
+                        <div className="text-xl sm:text-2xl font-bold text-white">{formatNumber(followingCount)}</div>
+                        <div className="text-xs sm:text-sm text-gray-400">Following</div>
                       </Card>
                     </Link>
-                    <Card variant="default" className="p-4 text-center">
-                      <div className="text-2xl font-bold text-white">{formatNumber(postsCount)}</div>
-                      <div className="text-sm text-gray-400">Posts</div>
+                    <Card variant="default" className="p-3 sm:p-4 text-center">
+                      <div className="text-xl sm:text-2xl font-bold text-white">{formatNumber(postsCount)}</div>
+                      <div className="text-xs sm:text-sm text-gray-400">Posts</div>
                     </Card>
-                    <Card variant="default" className="p-4 text-center">
-                      <div className="text-2xl font-bold text-white">{formatNumber(stats.totalLikes)}</div>
-                      <div className="text-sm text-gray-400">Likes</div>
+                    <Card variant="default" className="p-3 sm:p-4 text-center">
+                      <div className="text-xl sm:text-2xl font-bold text-white">{formatNumber(stats.totalLikes)}</div>
+                      <div className="text-xs sm:text-sm text-gray-400">Likes</div>
                     </Card>
                   </div>
 
                   {/* Actions */}
                   {!isOwnProfile && session?.user?.id !== user.id && (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <Button
                         onClick={handleFollow}
                         disabled={isLoading}
                         variant={isFollowing ? "outline" : "primary"}
                         size="default"
+                        className="flex-1 sm:flex-initial text-sm sm:text-base min-w-[100px]"
                       >
                         {isFollowing ? (
                           <>
-                            <UserMinus className="h-4 w-4 mr-2" />
-                            Unfollow
+                            <UserMinus className="h-4 w-4 mr-1.5 sm:mr-2 flex-shrink-0" />
+                            <span>Unfollow</span>
                           </>
                         ) : (
                           <>
-                            <UserPlus className="h-4 w-4 mr-2" />
-                            Follow
+                            <UserPlus className="h-4 w-4 mr-1.5 sm:mr-2 flex-shrink-0" />
+                            <span>Follow</span>
                           </>
                         )}
                       </Button>
-                      <Button variant="outline" size="default" onClick={() => router.push(`/chat?userId=${user.id}`)}>
-                        <Mail className="h-4 w-4 mr-2" />
-                        Message
+                      <Button 
+                        variant="outline" 
+                        size="default" 
+                        onClick={() => router.push(`/chat?userId=${user.id}`)}
+                        className="flex-1 sm:flex-initial text-sm sm:text-base min-w-[100px]"
+                      >
+                        <Mail className="h-4 w-4 mr-1.5 sm:mr-2 flex-shrink-0" />
+                        <span>Message</span>
                       </Button>
                     </div>
                   )}
@@ -351,29 +361,52 @@ export default function ProfileClient({
           </motion.div>
 
           {/* Tabs */}
-          <Tabs defaultValue="posts" className="mb-6">
-            <TabsList className={`grid w-full ${isOwnProfile ? "grid-cols-5" : "grid-cols-4"}`}>
-              <TabsTrigger value="posts">Posts</TabsTrigger>
-              <TabsTrigger value="about">About</TabsTrigger>
-              <TabsTrigger value="achievements">Achievements</TabsTrigger>
-              <TabsTrigger value="activity">Activity</TabsTrigger>
+          <Tabs defaultValue="posts" className="mb-4 sm:mb-6">
+            <TabsList className={`w-full flex sm:grid ${isOwnProfile ? "sm:grid-cols-5" : "sm:grid-cols-4"} gap-1 sm:gap-2 overflow-x-auto scrollbar-hide p-1 bg-gray-800/30 rounded-lg sm:rounded-xl border border-gray-700/30`}>
+              <TabsTrigger 
+                value="posts" 
+                className="flex-shrink-0 px-3 sm:px-4 py-2 text-xs sm:text-sm min-w-[80px] sm:min-w-0"
+              >
+                Posts
+              </TabsTrigger>
+              <TabsTrigger 
+                value="about" 
+                className="flex-shrink-0 px-3 sm:px-4 py-2 text-xs sm:text-sm min-w-[80px] sm:min-w-0"
+              >
+                About
+              </TabsTrigger>
+              <TabsTrigger 
+                value="achievements" 
+                className="flex-shrink-0 px-3 sm:px-4 py-2 text-xs sm:text-sm min-w-[100px] sm:min-w-0"
+              >
+                Achievements
+              </TabsTrigger>
+              <TabsTrigger 
+                value="activity" 
+                className="flex-shrink-0 px-3 sm:px-4 py-2 text-xs sm:text-sm min-w-[80px] sm:min-w-0"
+              >
+                Activity
+              </TabsTrigger>
               {isOwnProfile && (
-                <TabsTrigger value="viewers">
-                  <Eye className="h-4 w-4 mr-2" />
-                  Viewers
+                <TabsTrigger 
+                  value="viewers"
+                  className="flex-shrink-0 px-3 sm:px-4 py-2 text-xs sm:text-sm min-w-[90px] sm:min-w-0 flex items-center justify-center gap-1 sm:gap-2"
+                >
+                  <Eye className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                  <span>Viewers</span>
                 </TabsTrigger>
               )}
             </TabsList>
 
             {/* Posts Tab */}
-            <TabsContent value="posts" className="mt-6">
+            <TabsContent value="posts" className="mt-4 sm:mt-6">
               {posts.length === 0 ? (
-                <Card variant="default" className="p-12 text-center">
-                  <p className="text-gray-400 text-lg">No posts yet</p>
-                  <p className="text-gray-500 text-sm mt-2">Start sharing to see posts here</p>
+                <Card variant="default" className="p-8 sm:p-12 text-center">
+                  <p className="text-gray-400 text-base sm:text-lg">No posts yet</p>
+                  <p className="text-gray-500 text-xs sm:text-sm mt-2">Start sharing to see posts here</p>
                 </Card>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                   {posts.map((post) => (
                     <motion.div
                       key={post.id}
@@ -384,34 +417,34 @@ export default function ProfileClient({
                       <Link href={`/feed?post=${post.id}`}>
                         <Card variant="elevated" hover className="overflow-hidden">
                           {post.images && post.images.length > 0 ? (
-                            <div className="relative h-48 bg-gray-800">
+                            <div className="relative h-40 sm:h-48 bg-gray-800">
                               <img
                                 src={post.images[0]}
                                 alt="Post"
                                 className="w-full h-full object-cover"
                               />
                               <div className="absolute inset-0 bg-black/0 hover:bg-black/20 transition-all flex items-center justify-center opacity-0 hover:opacity-100">
-                                <div className="flex items-center gap-4 text-white">
+                                <div className="flex items-center gap-3 sm:gap-4 text-white text-xs sm:text-sm">
                                   <span className="flex items-center gap-1">
-                                    <Heart className="h-4 w-4" />
+                                    <Heart className="h-3 w-3 sm:h-4 sm:w-4" />
                                     {formatNumber(post.likesCount || 0)}
                                   </span>
                                   <span className="flex items-center gap-1">
-                                    <MessageCircle className="h-4 w-4" />
+                                    <MessageCircle className="h-3 w-3 sm:h-4 sm:w-4" />
                                     {formatNumber(post.commentsCount || 0)}
                                   </span>
                                 </div>
                               </div>
                             </div>
                           ) : (
-                            <div className="h-48 bg-gray-800 flex items-center justify-center p-4">
-                              <p className="text-gray-500 text-sm text-center line-clamp-3">
+                            <div className="h-40 sm:h-48 bg-gray-800 flex items-center justify-center p-3 sm:p-4">
+                              <p className="text-gray-500 text-xs sm:text-sm text-center line-clamp-3">
                                 {post.content}
                               </p>
                             </div>
                           )}
-                          <div className="p-3">
-                            <div className="flex items-center justify-between text-xs text-gray-400">
+                          <div className="p-2 sm:p-3">
+                            <div className="flex items-center justify-between text-[10px] sm:text-xs text-gray-400 gap-1 sm:gap-2">
                               <span className="flex items-center gap-1">
                                 <Heart className="h-3 w-3" />
                                 {formatNumber(post.likesCount || 0)}
@@ -439,49 +472,49 @@ export default function ProfileClient({
             </TabsContent>
 
             {/* About Tab */}
-            <TabsContent value="about" className="mt-6">
-              <Card variant="elevated" className="p-6">
-                <h3 className="text-xl font-bold text-white mb-4">About</h3>
-                <div className="space-y-4">
+            <TabsContent value="about" className="mt-4 sm:mt-6">
+              <Card variant="elevated" className="p-4 sm:p-6">
+                <h3 className="text-lg sm:text-xl font-bold text-white mb-3 sm:mb-4">About</h3>
+                <div className="space-y-3 sm:space-y-4">
                   {user.bio && (
                     <div>
-                      <h4 className="text-sm font-semibold text-gray-400 mb-2">Bio</h4>
-                      <p className="text-gray-300">{user.bio}</p>
+                      <h4 className="text-xs sm:text-sm font-semibold text-gray-400 mb-1.5 sm:mb-2">Bio</h4>
+                      <p className="text-sm sm:text-base text-gray-300 break-words">{user.bio}</p>
                     </div>
                   )}
                   {user.skills && user.skills.length > 0 && (
                     <div>
-                      <h4 className="text-sm font-semibold text-gray-400 mb-2">Skills</h4>
-                      <div className="flex flex-wrap gap-2">
+                      <h4 className="text-xs sm:text-sm font-semibold text-gray-400 mb-1.5 sm:mb-2">Skills</h4>
+                      <div className="flex flex-wrap gap-1.5 sm:gap-2">
                         {user.skills.map((skill, idx) => (
-                          <Badge key={idx} variant="outline">
+                          <Badge key={idx} variant="outline" className="text-xs sm:text-sm">
                             {skill}
                           </Badge>
                         ))}
                       </div>
                     </div>
                   )}
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     {user.location && (
                       <div>
-                        <h4 className="text-sm font-semibold text-gray-400 mb-2">Location</h4>
-                        <p className="text-gray-300 flex items-center gap-1">
-                          <MapPin className="h-4 w-4" />
-                          {user.location}
+                        <h4 className="text-xs sm:text-sm font-semibold text-gray-400 mb-1.5 sm:mb-2">Location</h4>
+                        <p className="text-sm sm:text-base text-gray-300 flex items-center gap-1">
+                          <MapPin className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                          <span className="truncate">{user.location}</span>
                         </p>
                       </div>
                     )}
                     {user.website && (
                       <div>
-                        <h4 className="text-sm font-semibold text-gray-400 mb-2">Website</h4>
+                        <h4 className="text-xs sm:text-sm font-semibold text-gray-400 mb-1.5 sm:mb-2">Website</h4>
                         <a
                           href={user.website}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-blue-400 hover:text-blue-300 flex items-center gap-1"
+                          className="text-blue-400 hover:text-blue-300 flex items-center gap-1 text-sm sm:text-base"
                         >
-                          <LinkIcon className="h-4 w-4" />
-                          {user.website.replace(/^https?:\/\//, "")}
+                          <LinkIcon className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                          <span className="truncate">{user.website.replace(/^https?:\/\//, "")}</span>
                         </a>
                       </div>
                     )}
@@ -491,19 +524,19 @@ export default function ProfileClient({
             </TabsContent>
 
             {/* Achievements Tab */}
-            <TabsContent value="achievements" className="mt-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <TabsContent value="achievements" className="mt-4 sm:mt-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                 {achievements.length === 0 ? (
-                  <Card variant="default" className="p-12 text-center col-span-full">
-                    <Trophy className="h-12 w-12 mx-auto mb-4 opacity-50 text-gray-400" />
-                    <p className="text-gray-400">No achievements yet</p>
+                  <Card variant="default" className="p-8 sm:p-12 text-center col-span-full">
+                    <Trophy className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-3 sm:mb-4 opacity-50 text-gray-400" />
+                    <p className="text-gray-400 text-sm sm:text-base">No achievements yet</p>
                   </Card>
                 ) : (
                   achievements.map((achievement, idx) => (
-                    <Card key={idx} variant="elevated" className="p-6 text-center">
-                      <Trophy className="h-12 w-12 mx-auto mb-4 text-yellow-400" />
-                      <h4 className="font-bold text-white mb-2">{achievement}</h4>
-                      <p className="text-sm text-gray-400">Achievement unlocked!</p>
+                    <Card key={idx} variant="elevated" className="p-4 sm:p-6 text-center">
+                      <Trophy className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-3 sm:mb-4 text-yellow-400" />
+                      <h4 className="font-bold text-white mb-1.5 sm:mb-2 text-sm sm:text-base">{achievement}</h4>
+                      <p className="text-xs sm:text-sm text-gray-400">Achievement unlocked!</p>
                     </Card>
                   ))
                 )}
@@ -511,29 +544,29 @@ export default function ProfileClient({
             </TabsContent>
 
             {/* Activity Tab */}
-            <TabsContent value="activity" className="mt-6">
-              <Card variant="elevated" className="p-6">
-                <h3 className="text-xl font-bold text-white mb-4">Recent Activity</h3>
-                <div className="space-y-4">
-                  <div className="flex items-center gap-4 p-4 bg-gray-800/50 rounded-lg">
-                    <TrendingUp className="h-5 w-5 text-green-400" />
-                    <div className="flex-1">
-                      <p className="text-white font-medium">Post reached 100 likes</p>
-                      <p className="text-sm text-gray-400">2 hours ago</p>
+            <TabsContent value="activity" className="mt-4 sm:mt-6">
+              <Card variant="elevated" className="p-4 sm:p-6">
+                <h3 className="text-lg sm:text-xl font-bold text-white mb-3 sm:mb-4">Recent Activity</h3>
+                <div className="space-y-3 sm:space-y-4">
+                  <div className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 bg-gray-800/50 rounded-lg">
+                    <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-green-400 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white font-medium text-sm sm:text-base">Post reached 100 likes</p>
+                      <p className="text-xs sm:text-sm text-gray-400">2 hours ago</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4 p-4 bg-gray-800/50 rounded-lg">
-                    <UserPlus className="h-5 w-5 text-blue-400" />
-                    <div className="flex-1">
-                      <p className="text-white font-medium">Gained 10 new followers</p>
-                      <p className="text-sm text-gray-400">1 day ago</p>
+                  <div className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 bg-gray-800/50 rounded-lg">
+                    <UserPlus className="h-4 w-4 sm:h-5 sm:w-5 text-blue-400 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white font-medium text-sm sm:text-base">Gained 10 new followers</p>
+                      <p className="text-xs sm:text-sm text-gray-400">1 day ago</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4 p-4 bg-gray-800/50 rounded-lg">
-                    <Trophy className="h-5 w-5 text-yellow-400" />
-                    <div className="flex-1">
-                      <p className="text-white font-medium">Unlocked achievement: First Post</p>
-                      <p className="text-sm text-gray-400">3 days ago</p>
+                  <div className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 bg-gray-800/50 rounded-lg">
+                    <Trophy className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-400 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white font-medium text-sm sm:text-base">Unlocked achievement: First Post</p>
+                      <p className="text-xs sm:text-sm text-gray-400">3 days ago</p>
                     </div>
                   </div>
                 </div>
@@ -542,7 +575,7 @@ export default function ProfileClient({
 
             {/* Viewers Tab */}
             {isOwnProfile && (
-              <TabsContent value="viewers" className="mt-6">
+              <TabsContent value="viewers" className="mt-4 sm:mt-6">
                 <ViewersList />
               </TabsContent>
             )}
@@ -575,37 +608,38 @@ function ViewersList() {
   }, []);
 
   if (loading) {
-    return <div className="text-white text-center py-10">Loading viewers...</div>;
+    return <div className="text-white text-center py-8 sm:py-10 text-sm sm:text-base">Loading viewers...</div>;
   }
 
   if (viewers.length === 0) {
     return (
-      <Card variant="default" className="p-12 text-center">
-        <Eye className="h-12 w-12 mx-auto mb-4 opacity-50 text-gray-400" />
-        <p className="text-gray-400">No profile views yet</p>
+      <Card variant="default" className="p-8 sm:p-12 text-center">
+        <Eye className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-3 sm:mb-4 opacity-50 text-gray-400" />
+        <p className="text-gray-400 text-sm sm:text-base">No profile views yet</p>
       </Card>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       {viewers.map((view: any, idx: number) => (
-        <Card key={idx} variant="elevated" className="p-4 flex items-center gap-4">
+        <Card key={idx} variant="elevated" className="p-3 sm:p-4 flex items-center gap-3 sm:gap-4">
           <RealTimeAvatar
             userId={view.viewer.id}
             src={view.viewer.avatar}
             alt={view.viewer.name || "User"}
             size="md"
+            className="flex-shrink-0"
           />
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <Link href={`/profile/${view.viewer.username || view.viewer.id}`} className="hover:underline">
-              <h4 className="font-semibold text-white">{view.viewer.name}</h4>
+              <h4 className="font-semibold text-white text-sm sm:text-base truncate">{view.viewer.name}</h4>
             </Link>
-            <p className="text-sm text-gray-400">@{view.viewer.username}</p>
+            <p className="text-xs sm:text-sm text-gray-400 truncate">@{view.viewer.username}</p>
           </div>
-          <div className="text-right text-gray-500 text-xs">
-            <p>Viewed on {new Date(view.viewedAt).toLocaleDateString()}</p>
-            <p>{new Date(view.viewedAt).toLocaleTimeString()}</p>
+          <div className="text-right text-gray-500 text-[10px] sm:text-xs flex-shrink-0">
+            <p className="whitespace-nowrap">Viewed on {new Date(view.viewedAt).toLocaleDateString()}</p>
+            <p className="whitespace-nowrap">{new Date(view.viewedAt).toLocaleTimeString()}</p>
           </div>
         </Card>
       ))}

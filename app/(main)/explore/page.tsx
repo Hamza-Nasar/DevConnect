@@ -259,8 +259,8 @@ export default function ExplorePage() {
                           </div>
                         </div>
                         {/* Placeholder follow button */}
-                        <Button variant="primary" size="sm">
-                          View
+                        <Button variant="primary" size="sm" className="text-xs sm:text-sm whitespace-nowrap">
+                          <span>View</span>
                         </Button>
                       </div>
                     </Card>
