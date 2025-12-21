@@ -12,21 +12,13 @@ import {
   Phone,
   Video,
   UserPlus,
-  Settings,
-  X,
   Image as ImageIcon,
   File,
-  Mic,
   MessageCircle,
   Check,
   CheckCheck,
-  Clock,
-  ImagePlus,
   Video as VideoIcon,
   FileText,
-  Music,
-  MapPin,
-  Gift,
   ArrowLeft,
 } from "lucide-react";
 import Navbar from "@/components/navbar/Navbar";
@@ -44,7 +36,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import EmojiPicker from "emoji-picker-react";
 // @ts-ignore
-import SimplePeer from "simple-peer";
+import { useCall } from "@/components/providers/CallProvider";
 
 interface Message {
   id: string;
@@ -109,21 +101,11 @@ export default function ChatPage() {
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
-  // Call States
-  const [callActive, setCallActive] = useState(false);
-  const [incomingCall, setIncomingCall] = useState<any>(null);
-  const [outgoingCall, setOutgoingCall] = useState<{ userId: string; isVideo: boolean; userName?: string; userAvatar?: string } | null>(null);
-  const [callAccepted, setCallAccepted] = useState(false);
-  const [callEnded, setCallEnded] = useState(false);
-  const [activeCallIsVideo, setActiveCallIsVideo] = useState(true);
-  const [stream, setStream] = useState<MediaStream | null>(null);
-  const [otherUserStream, setOtherUserStream] = useState<MediaStream | null>(null);
-  const myVideo = useRef<HTMLVideoElement>(null);
-  const userVideo = useRef<HTMLVideoElement>(null);
-  const connectionRef = useRef<any>(null);
-  const ringtoneRef = useRef<HTMLAudioElement | null>(null); // Ringtone Ref
   const [socketStatus, setSocketStatus] = useState<'connected' | 'disconnected'>('disconnected');
   const [socketId, setSocketId] = useState<string | null>(null);
+
+  // Use global call context
+  const { callUser: initiateGlobalCall } = useCall();
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -145,19 +127,6 @@ export default function ChatPage() {
       currentUserIdRef.current = session.user.id;
     }
   }, [session?.user?.id]);
-
-  // Handle media stream attachment to video elements
-  useEffect(() => {
-    if (stream && myVideo.current) {
-      myVideo.current.srcObject = stream;
-    }
-  }, [stream, callActive, callAccepted]);
-
-  useEffect(() => {
-    if (otherUserStream && userVideo.current) {
-      userVideo.current.srcObject = otherUserStream;
-    }
-  }, [otherUserStream, callActive, callAccepted]);
 
   useEffect(() => {
     if (!session?.user?.id) return;
@@ -360,71 +329,6 @@ export default function ChatPage() {
       }
     };
 
-    const onCallUser = (data: any) => {
-      console.log("📞 [Socket] Incoming Call Event:", data);
-      const currentUserId = currentUserIdRef.current;
-      console.log("📞 [Socket] Current User ID:", currentUserId, "Call From:", data.from);
-
-      // Check if call is for current user (not from self)
-      if (!currentUserId) {
-        console.warn("⚠️ [Socket] No current user ID available");
-        return;
-      }
-
-      if (data.from === currentUserId) {
-        console.log("⚠️ [Socket] Call from self, ignoring");
-        return;
-      }
-
-      // This is an incoming call for current user
-      console.log("✅ [Socket] Incoming call received for current user");
-      setIncomingCall({
-        isReceivingCall: true,
-        from: data.from,
-        name: data.name || "Unknown",
-        avatar: data.avatar,
-        signal: data.signal,
-        isVideo: data.isVideo ?? true
-      });
-      setOutgoingCall(null); // Clear any outgoing call
-      setCallActive(true);
-      setCallAccepted(false);
-      setCallEnded(false);
-    };
-
-    const onCallEnded = () => {
-      console.log("📴 [Socket] Call Ended");
-      setCallEnded(true);
-
-      // Stop all tracks
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-        setStream(null);
-      }
-      if (otherUserStream) {
-        otherUserStream.getTracks().forEach(track => track.stop());
-        setOtherUserStream(null);
-      }
-
-      // Clean up peer connection
-      if (connectionRef.current) {
-        connectionRef.current.destroy();
-        connectionRef.current = null;
-      }
-
-      // Clear video elements
-      if (myVideo.current) {
-        myVideo.current.srcObject = null;
-      }
-      if (userVideo.current) {
-        userVideo.current.srcObject = null;
-      }
-
-      setCallActive(false);
-      setCallAccepted(false);
-      setIncomingCall(null);
-    };
-
     // Only emit join if already connected when effect runs
     if (socket.connected && !hasJoinedRef.current) {
       console.log("🔌 [Socket] Already connected, emitting join with userId:", session.user.id);
@@ -438,8 +342,6 @@ export default function ChatPage() {
     socket.on("typing", onTyping);
     socket.on("message_read", onMessageRead);
     socket.on("user_status", onUserStatus);
-    socket.on("call_user", onCallUser);
-    socket.on("call_ended", onCallEnded);
 
     // Debug: Log ALL socket events to see what's being received
     const debugHandler = (eventName: string, ...args: any[]) => {
@@ -458,8 +360,6 @@ export default function ChatPage() {
       socket.off("typing", onTyping);
       socket.off("message_read", onMessageRead);
       socket.off("user_status", onUserStatus);
-      socket.off("call_user", onCallUser);
-      socket.off("call_ended", onCallEnded);
       socket.offAny(debugHandler);
 
       // Cleanup typing timeout
@@ -483,139 +383,6 @@ export default function ChatPage() {
       markAsRead(selectedChat.userId);
     }
   }, [selectedChat]);
-
-  // Ringtone Logic - Initialize audio element once
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    if (!ringtoneRef.current) {
-      try {
-        ringtoneRef.current = new Audio("/sounds/ringtone.mp3");
-        ringtoneRef.current.loop = true;
-        ringtoneRef.current.volume = 0.7;
-        ringtoneRef.current.preload = "auto";
-
-        // Handle audio load errors
-        ringtoneRef.current.addEventListener("error", (e) => {
-          const error = ringtoneRef.current?.error;
-          if (error) {
-            let errorMsg = "Unknown error";
-            switch (error.code) {
-              case MediaError.MEDIA_ERR_ABORTED:
-                errorMsg = "Audio loading aborted";
-                break;
-              case MediaError.MEDIA_ERR_NETWORK:
-                errorMsg = "Network error loading audio";
-                break;
-              case MediaError.MEDIA_ERR_DECODE:
-                errorMsg = "Audio decode error";
-                break;
-              case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
-                errorMsg = "Audio format not supported or file not found";
-                break;
-            }
-            console.warn("⚠️ [Ringtone] Audio load error:", errorMsg, "Code:", error.code);
-          } else {
-            console.warn("⚠️ [Ringtone] Audio load error (no error details)");
-          }
-        });
-
-        // Handle audio can play
-        ringtoneRef.current.addEventListener("canplaythrough", () => {
-          console.log("✅ [Ringtone] Audio ready to play");
-        });
-
-        // Handle audio loaded
-        ringtoneRef.current.addEventListener("loadeddata", () => {
-          console.log("✅ [Ringtone] Audio data loaded");
-        });
-
-        // Load the audio (but don't fail if it doesn't load)
-        try {
-          ringtoneRef.current.load();
-        } catch (err: any) {
-          console.warn("⚠️ [Ringtone] Audio load() failed (non-critical):", err.message);
-        }
-      } catch (error: any) {
-        console.warn("⚠️ [Ringtone] Failed to create audio element (non-critical):", error.message);
-        // Don't create audio element if it fails - app will continue without ringtone
-      }
-    }
-  }, []);
-
-  // Sync video elements with streams
-  useEffect(() => {
-    if (stream && myVideo.current && myVideo.current.srcObject !== stream) {
-      console.log("🔄 [Call] Syncing local stream to video element");
-      myVideo.current.srcObject = stream;
-    }
-  }, [stream]);
-
-  useEffect(() => {
-    if (otherUserStream && userVideo.current && userVideo.current.srcObject !== otherUserStream) {
-      console.log("🔄 [Call] Syncing remote stream to video element");
-      userVideo.current.srcObject = otherUserStream;
-    }
-  }, [otherUserStream]);
-
-  // Ringtone Play/Pause Logic
-  useEffect(() => {
-    if (!ringtoneRef.current) return;
-
-    if (incomingCall && !callAccepted && !callEnded) {
-      console.log("🔔 [Ringtone] Starting ringtone");
-
-      // Check if audio is ready
-      if (ringtoneRef.current.readyState >= 2) { // HAVE_CURRENT_DATA or higher
-        const playPromise = ringtoneRef.current.play();
-        if (playPromise !== undefined) {
-          playPromise
-            .then(() => {
-              console.log("✅ [Ringtone] Playing");
-            })
-            .catch((e) => {
-              console.error("❌ [Ringtone] Play failed:", e);
-              // Try to play after user interaction
-              const handleUserInteraction = () => {
-                if (ringtoneRef.current && incomingCall && !callAccepted) {
-                  ringtoneRef.current.play().catch(err =>
-                    console.log("Audio play failed after interaction", err)
-                  );
-                }
-                document.removeEventListener('click', handleUserInteraction);
-                document.removeEventListener('touchstart', handleUserInteraction);
-              };
-              document.addEventListener('click', handleUserInteraction, { once: true });
-              document.addEventListener('touchstart', handleUserInteraction, { once: true });
-            });
-        }
-      } else {
-        // Wait for audio to load
-        const handleCanPlay = () => {
-          if (ringtoneRef.current && incomingCall && !callAccepted) {
-            ringtoneRef.current.play().catch(e =>
-              console.error("Play failed after load", e)
-            );
-          }
-          ringtoneRef.current?.removeEventListener("canplaythrough", handleCanPlay);
-        };
-        ringtoneRef.current.addEventListener("canplaythrough", handleCanPlay);
-      }
-    } else {
-      if (ringtoneRef.current && !ringtoneRef.current.paused) {
-        ringtoneRef.current.pause();
-        ringtoneRef.current.currentTime = 0;
-        console.log("🔕 [Ringtone] Stopped");
-      }
-    }
-
-    return () => {
-      if (ringtoneRef.current && !ringtoneRef.current.paused) {
-        ringtoneRef.current.pause();
-        ringtoneRef.current.currentTime = 0;
-      }
-    };
-  }, [incomingCall, callAccepted, callEnded]);
 
   useEffect(() => {
     scrollToBottom();
@@ -808,184 +575,13 @@ export default function ChatPage() {
   };
 
   const callUser = async (userId: string, isVideo: boolean = true) => {
-    setCallActive(true);
-    setCallEnded(false);
-    setCallAccepted(false);
-    setIncomingCall(null); // Clear any incoming call
-    setOutgoingCall({
+    if (!selectedChat) return;
+    initiateGlobalCall(
       userId,
-      isVideo,
-      userName: selectedChat?.user.name,
-      userAvatar: selectedChat?.user.avatar
-    }); // Track outgoing call
-    setActiveCallIsVideo(isVideo);
-    const constraints = { video: isVideo, audio: true };
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      setStream(stream);
-
-      // Set stream to video element immediately
-      if (myVideo.current) {
-        myVideo.current.srcObject = stream;
-      }
-
-      const peer = new SimplePeer({
-        initiator: true,
-        trickle: false,
-        stream,
-        config: {
-          iceServers: [
-            { urls: "stun:stun.l.google.com:19302" },
-            { urls: "stun:stun1.l.google.com:19302" }
-          ]
-        }
-      });
-
-      peer.on("signal", (data: any) => {
-        const socket = getSocket();
-        socket?.emit("call_user", {
-          userToCall: userId,
-          signalData: data,
-          from: session?.user?.id,
-          name: session?.user?.name,
-          avatar: session?.user?.image,
-          isVideo
-        });
-      });
-
-      peer.on("stream", (currentStream: MediaStream) => {
-        console.log("📹 [Call] Received remote stream");
-        setOtherUserStream(currentStream);
-        if (userVideo.current) {
-          userVideo.current.srcObject = currentStream;
-        }
-      });
-
-      peer.on("error", (err: any) => {
-        console.error("❌ [Call] Peer error:", err);
-        toast.error("Call connection error");
-      });
-
-      const socket = getSocket();
-      const handleCallAccepted = (signal: any) => {
-        console.log("✅ [Call] Call accepted, signaling peer");
-        setCallAccepted(true);
-        peer.signal(signal);
-        socket?.off("call_accepted", handleCallAccepted);
-      };
-
-      socket?.on("call_accepted", handleCallAccepted);
-
-      connectionRef.current = peer;
-    } catch (err) {
-      console.error("Failed to get media", err);
-      setCallActive(false);
-      toast.error("Could not access camera/microphone");
-    }
-  };
-
-  const answerCall = async () => {
-    const isVideo = incomingCall?.isVideo ?? true;
-    setActiveCallIsVideo(isVideo);
-
-    try {
-      console.log("📞 [Call] Answering call, getting user media...");
-      const stream = await navigator.mediaDevices.getUserMedia({ video: isVideo, audio: true });
-      setStream(stream);
-
-      // Set stream to video element immediately
-      if (myVideo.current) {
-        myVideo.current.srcObject = stream;
-        console.log("✅ [Call] Local stream set to video element");
-      }
-
-      console.log("📞 [Call] Creating peer connection...");
-      const peer = new SimplePeer({
-        initiator: false,
-        trickle: false,
-        stream,
-        config: {
-          iceServers: [
-            { urls: "stun:stun.l.google.com:19302" },
-            { urls: "stun:stun1.l.google.com:19302" }
-          ]
-        }
-      });
-
-      peer.on("signal", (data: any) => {
-        console.log("📞 [Call] Peer signal generated, sending answer...");
-        const socket = getSocket();
-        socket?.emit("answer_call", { signal: data, to: incomingCall.from });
-      });
-
-      peer.on("stream", (currentStream: MediaStream) => {
-        console.log("📹 [Call] Received remote stream!", currentStream);
-        setOtherUserStream(currentStream);
-        if (userVideo.current) {
-          userVideo.current.srcObject = currentStream;
-          console.log("✅ [Call] Remote stream set to video element");
-        } else {
-          console.warn("⚠️ [Call] userVideo ref is null!");
-        }
-      });
-
-      peer.on("connect", () => {
-        console.log("✅ [Call] Peer connection established!");
-        setCallAccepted(true);
-        setIncomingCall(null); // Clear incoming call state when connected
-        setOutgoingCall(null); // Clear outgoing call state when connected
-      });
-
-      peer.on("error", (err: any) => {
-        console.error("❌ [Call] Peer error:", err);
-        toast.error("Call connection error: " + err.message);
-      });
-
-      console.log("📞 [Call] Signaling peer with incoming call signal...");
-      peer.signal(incomingCall.signal);
-      connectionRef.current = peer;
-    } catch (err: any) {
-      console.error("❌ [Call] Failed to get media:", err);
-      toast.error("Could not access camera/microphone: " + err.message);
-      setCallAccepted(false);
-    }
-  };
-
-  const leaveCall = () => {
-    setCallEnded(true);
-
-    // Stop all tracks
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-      setStream(null);
-    }
-    if (otherUserStream) {
-      otherUserStream.getTracks().forEach(track => track.stop());
-      setOtherUserStream(null);
-    }
-
-    // Clean up peer connection
-    if (connectionRef.current) {
-      connectionRef.current.destroy();
-      connectionRef.current = null;
-    }
-
-    // Clear video elements
-    if (myVideo.current) {
-      myVideo.current.srcObject = null;
-    }
-    if (userVideo.current) {
-      userVideo.current.srcObject = null;
-    }
-
-    const socket = getSocket();
-    const toId = incomingCall?.from || selectedChat?.userId;
-    if (toId) socket?.emit("end_call", { to: toId });
-
-    setCallActive(false);
-    setCallAccepted(false);
-    setIncomingCall(null);
-    setOutgoingCall(null);
+      selectedChat.user.name || "User",
+      selectedChat.user.avatar || "",
+      isVideo
+    );
   };
 
 
@@ -1683,349 +1279,6 @@ export default function ChatPage() {
           </div>
         </div>
       </div>
-
-      {/* Incoming Call Modal (Receiver) */}
-      <AnimatePresence>
-        {incomingCall && !callAccepted && callActive && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-xl"
-          >
-            {incomingCall.isVideo ? (
-              /* INCOMING VIDEO CALL */
-              <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.9, opacity: 0 }}
-                className="relative w-full max-w-md bg-gradient-to-br from-gray-900 to-black rounded-3xl overflow-hidden shadow-2xl border border-purple-500/50 p-8"
-              >
-                <div className="flex flex-col items-center justify-center min-h-[400px]">
-                  <div className="relative mb-6">
-                    <div className="absolute inset-0 bg-purple-500/30 rounded-full animate-ping blur-xl" />
-                    <RealTimeAvatar
-                      userId={incomingCall.from}
-                      src={incomingCall.avatar}
-                      size="xl"
-                      className="w-32 h-32 relative z-10 border-4 border-purple-500/50 shadow-2xl"
-                    />
-                  </div>
-                  <h2 className="text-3xl font-bold text-white mb-2">{incomingCall.name}</h2>
-                  <p className="text-purple-400 font-medium animate-pulse mb-8">Incoming Video Call...</p>
-
-                  <div className="flex gap-4">
-                    <button
-                      onClick={answerCall}
-                      className="w-16 h-16 rounded-full bg-green-500 flex items-center justify-center text-white shadow-lg shadow-green-500/30 hover:scale-110 transition-transform"
-                    >
-                      <Phone className="w-8 h-8" />
-                    </button>
-                    <button
-                      onClick={leaveCall}
-                      className="w-16 h-16 rounded-full bg-red-500 flex items-center justify-center text-white shadow-lg shadow-red-500/30 hover:scale-110 transition-transform"
-                    >
-                      <Phone className="w-8 h-8 rotate-[135deg]" />
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            ) : (
-              /* INCOMING AUDIO CALL */
-              <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.9, opacity: 0 }}
-                className="relative w-full max-w-md bg-[#0f111a] rounded-[3rem] border border-green-500/50 shadow-2xl overflow-hidden p-8 flex flex-col items-center justify-between min-h-[500px]"
-              >
-                <div className="flex flex-col items-center mt-10">
-                  <div className="relative mb-8">
-                    <div className="absolute inset-0 border border-green-500/30 rounded-full animate-[ping_2s_linear_infinite]" />
-                    <div className="absolute inset-0 border border-green-500/20 rounded-full animate-[ping_2s_linear_infinite_1s]" />
-                    <RealTimeAvatar
-                      userId={incomingCall.from}
-                      src={incomingCall.avatar}
-                      size="xl"
-                      className="w-32 h-32 border-2 border-green-500/30 shadow-2xl relative z-10"
-                    />
-                  </div>
-                  <h2 className="text-3xl font-bold text-white mb-2">{incomingCall.name}</h2>
-                  <p className="text-green-400 font-medium animate-pulse">Incoming Voice Call...</p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-12 mb-8">
-                  <button
-                    onClick={answerCall}
-                    className="flex flex-col items-center gap-3 group"
-                  >
-                    <div className="w-16 h-16 rounded-full bg-green-500 flex items-center justify-center text-white shadow-lg shadow-green-500/30 transition-transform group-hover:scale-110">
-                      <Phone className="w-8 h-8 animate-pulse" />
-                    </div>
-                    <span className="text-sm font-medium text-gray-400 group-hover:text-white transition-colors">Accept</span>
-                  </button>
-                  <button
-                    onClick={leaveCall}
-                    className="flex flex-col items-center gap-3 group"
-                  >
-                    <div className="w-16 h-16 rounded-full bg-red-500 flex items-center justify-center text-white shadow-lg shadow-red-500/30 transition-transform group-hover:scale-110">
-                      <Phone className="w-8 h-8 rotate-[135deg]" />
-                    </div>
-                    <span className="text-sm font-medium text-gray-400 group-hover:text-white transition-colors">Decline</span>
-                  </button>
-                </div>
-              </motion.div>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Outgoing Call Modal (Caller) */}
-      <AnimatePresence>
-        {outgoingCall && !callAccepted && callActive && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-xl"
-          >
-            {outgoingCall.isVideo ? (
-              /* OUTGOING VIDEO CALL */
-              <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.9, opacity: 0 }}
-                className="relative w-full max-w-md bg-gradient-to-br from-gray-900 to-black rounded-3xl overflow-hidden shadow-2xl border border-blue-500/50 p-8"
-              >
-                <div className="flex flex-col items-center justify-center min-h-[400px]">
-                  <div className="relative mb-6">
-                    <div className="absolute inset-0 bg-blue-500/30 rounded-full animate-ping blur-xl" />
-                    <RealTimeAvatar
-                      userId={outgoingCall.userId}
-                      src={outgoingCall.userAvatar}
-                      size="xl"
-                      className="w-32 h-32 relative z-10 border-4 border-blue-500/50 shadow-2xl"
-                    />
-                  </div>
-                  <h2 className="text-3xl font-bold text-white mb-2">{outgoingCall.userName || "User"}</h2>
-                  <p className="text-blue-400 font-medium animate-pulse mb-8">Calling...</p>
-
-                  <button
-                    onClick={leaveCall}
-                    className="w-16 h-16 rounded-full bg-red-500 flex items-center justify-center text-white shadow-lg shadow-red-500/30 hover:scale-110 transition-transform"
-                  >
-                    <Phone className="w-8 h-8 rotate-[135deg]" />
-                  </button>
-                </div>
-              </motion.div>
-            ) : (
-              /* OUTGOING AUDIO CALL */
-              <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.9, opacity: 0 }}
-                className="relative w-full max-w-md bg-[#0f111a] rounded-[3rem] border border-green-500/50 shadow-2xl overflow-hidden p-8 flex flex-col items-center justify-between min-h-[500px]"
-              >
-                <div className="flex flex-col items-center mt-10">
-                  <div className="relative mb-8">
-                    <div className="absolute inset-0 border border-green-500/30 rounded-full animate-[ping_2s_linear_infinite]" />
-                    <div className="absolute inset-0 border border-green-500/20 rounded-full animate-[ping_2s_linear_infinite_1s]" />
-                    <RealTimeAvatar
-                      userId={outgoingCall.userId}
-                      src={outgoingCall.userAvatar}
-                      size="xl"
-                      className="w-32 h-32 border-2 border-green-500/30 shadow-2xl relative z-10"
-                    />
-                  </div>
-                  <h2 className="text-3xl font-bold text-white mb-2">{outgoingCall.userName || "User"}</h2>
-                  <p className="text-green-400 font-medium animate-pulse">Calling...</p>
-                </div>
-
-                <button
-                  onClick={leaveCall}
-                  className="w-16 h-16 rounded-full bg-red-500 flex items-center justify-center text-white shadow-lg shadow-red-500/30 hover:scale-110 transition-transform mb-8"
-                >
-                  <Phone className="w-8 h-8 rotate-[135deg]" />
-                </button>
-              </motion.div>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Active Call Modal (Both Connected) */}
-      <AnimatePresence>
-        {callActive && callAccepted && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-xl"
-          >
-            {activeCallIsVideo ? (
-              /* VIDEO CALL MODAL */
-              <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.9, opacity: 0 }}
-                className="relative w-full max-w-6xl h-[90vh] bg-gradient-to-br from-gray-900 to-black rounded-3xl overflow-hidden shadow-2xl border border-gray-800"
-              >
-                {/* Background Ambient Glow */}
-                <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-purple-600/20 blur-[150px] rounded-full pointer-events-none mix-blend-screen" />
-                <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-blue-600/20 blur-[150px] rounded-full pointer-events-none mix-blend-screen" />
-
-                <div className="absolute inset-0 flex flex-col p-6 z-10">
-                  {/* Video Grid */}
-                  <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-6 relative">
-                    {/* My Stream */}
-                    <div className="relative rounded-2xl overflow-hidden bg-gray-800 shadow-xl border border-gray-700/50 group">
-                      <video
-                        playsInline
-                        muted
-                        ref={myVideo}
-                        autoPlay
-                        className="w-full h-full object-cover transform scale-x-[-1]"
-                      />
-                      {!stream && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-gray-800/50">
-                          <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
-                        </div>
-                      )}
-                      <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-md px-4 py-1.5 rounded-full text-white text-sm font-medium border border-white/10 flex items-center gap-2">
-                        <span className="w-2 h-2 bg-green-500 rounded-full" />
-                        You
-                      </div>
-                    </div>
-
-                    {/* Remote Stream */}
-                    <div className="relative rounded-2xl overflow-hidden bg-gray-800 shadow-xl border border-gray-700/50">
-                      <video
-                        playsInline
-                        ref={userVideo}
-                        autoPlay
-                        className="w-full h-full object-cover"
-                      />
-                      {!otherUserStream && (
-                        <div className="w-full h-full flex flex-col items-center justify-center bg-gray-800/50 backdrop-blur-sm relative">
-                          {/* Pulsing Avatar Effect */}
-                          <div className="relative">
-                            <div className="absolute inset-0 bg-blue-500/30 rounded-full animate-ping blur-xl" />
-                            <RealTimeAvatar
-                              userId={selectedChat?.userId || ""}
-                              src={selectedChat?.user.avatar}
-                              size="xl"
-                              className="w-32 h-32 relative z-10 border-4 border-blue-500/50 shadow-2xl"
-                            />
-                          </div>
-                          <h3 className="mt-6 text-2xl font-bold text-white tracking-tight">
-                            {selectedChat?.user.name || "User"}
-                          </h3>
-                          <p className="mt-2 text-blue-400 font-medium animate-pulse">
-                            Connecting...
-                          </p>
-                        </div>
-                      )}
-                      {otherUserStream && (
-                        <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-md px-4 py-1.5 rounded-full text-white text-sm font-medium border border-white/10 flex items-center gap-2">
-                          <span className="w-2 h-2 bg-green-500 rounded-full" />
-                          {selectedChat?.user.name || "User"}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Controls Bar */}
-                  <div className="h-24 mt-6 flex items-center justify-center gap-6">
-                    <button className="p-4 rounded-full bg-gray-800 hover:bg-gray-700 text-white transition-all duration-200 border border-gray-700 hover:border-gray-600 shadow-lg">
-                      <Mic className="w-6 h-6" />
-                    </button>
-
-                    <button
-                      onClick={leaveCall}
-                      className="p-5 rounded-full bg-red-600 hover:bg-red-500 text-white transition-all duration-200 shadow-xl shadow-red-600/20 hover:scale-105"
-                    >
-                      <Phone className="w-8 h-8 rotate-[135deg]" />
-                    </button>
-
-                    <button className="p-4 rounded-full bg-gray-800 hover:bg-gray-700 text-white transition-all duration-200 border border-gray-700 hover:border-gray-600 shadow-lg">
-                      <Video className="w-6 h-6" />
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            ) : (
-              /* AUDIO CALL MODAL */
-              <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.9, opacity: 0 }}
-                className="relative w-full max-w-md bg-[#0f111a] rounded-[3rem] border border-gray-800 shadow-2xl overflow-hidden p-8 flex flex-col items-center justify-between min-h-[500px]"
-              >
-                {/* Visualizer Background */}
-                <div className="absolute inset-0 pointer-events-none">
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-green-500/10 rounded-full blur-[80px]" />
-                </div>
-
-                <div className="relative z-10 flex flex-col items-center mt-10">
-                  <div className="relative mb-8">
-                    {/* Animated Rings */}
-                    {(!callAccepted || incomingCall) && (
-                      <>
-                        <div className="absolute inset-0 border border-green-500/30 rounded-full animate-[ping_2s_linear_infinite]" />
-                        <div className="absolute inset-0 border border-green-500/20 rounded-full animate-[ping_2s_linear_infinite_1s]" />
-                      </>
-                    )}
-
-                    <RealTimeAvatar
-                      userId={incomingCall ? incomingCall.from : selectedChat?.userId}
-                      src={incomingCall ? incomingCall.avatar : selectedChat?.user.avatar}
-                      size="xl"
-                      className="w-32 h-32 border-2 border-green-500/30 shadow-2xl relative z-10"
-                    />
-                  </div>
-
-                  <h2 className="text-3xl font-bold text-white mb-2 text-center">
-                    {incomingCall ? incomingCall.name : selectedChat?.user.name}
-                  </h2>
-                  <p className={`text-sm font-medium tracking-wider uppercase ${callAccepted ? "text-gray-400" : "text-green-400 animate-pulse"}`}>
-                    {callAccepted ? "Call in progress" : incomingCall ? "Incoming Call..." : "Calling..."}
-                  </p>
-                </div>
-
-                <div className="relative z-10 grid grid-cols-2 gap-12 mb-8">
-                  {incomingCall && !callAccepted && (
-                    <button
-                      onClick={answerCall}
-                      className="flex flex-col items-center gap-3 group"
-                    >
-                      <div className="w-16 h-16 rounded-full bg-green-500 flex items-center justify-center text-white shadow-lg shadow-green-500/30 transition-transform group-hover:scale-110">
-                        <Phone className="w-8 h-8 animate-pulse" />
-                      </div>
-                      <span className="text-sm font-medium text-gray-400 group-hover:text-white transition-colors">Accept</span>
-                    </button>
-                  )}
-
-                  <button
-                    onClick={leaveCall}
-                    className="flex flex-col items-center gap-3 group col-span-2 mx-auto"
-                  >
-                    <div className="w-16 h-16 rounded-full bg-red-500 flex items-center justify-center text-white shadow-lg shadow-red-500/30 transition-transform group-hover:scale-110">
-                      <Phone className="w-8 h-8 rotate-[135deg]" />
-                    </div>
-                    <span className="text-sm font-medium text-gray-400 group-hover:text-white transition-colors">End</span>
-                  </button>
-                </div>
-
-                {/* Hidden Video Elements for Audio Call Stream */}
-                <div className="hidden">
-                  {stream && <video playsInline muted ref={myVideo} autoPlay />}
-                  <video playsInline ref={userVideo} autoPlay />
-                </div>
-              </motion.div>
-            )}
-          </motion.div>
-        )
-        }
-      </AnimatePresence >
-    </div >
+    </div>
   );
 }

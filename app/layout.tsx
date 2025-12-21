@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import SessionProvider from "@/components/providers/SessionProvider";
+import { CallProvider } from "@/components/providers/CallProvider";
 import { ToastProvider } from "@/components/ui/toast";
 import { SmoothScroll } from "@/components/layouts/SmoothScroll";
 import "./globals.css";
@@ -19,8 +20,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="antialiased bg-[#0a0a0a] text-[#ededed]">
         <SmoothScroll>
           <SessionProvider>
-            <ToastProvider />
-            {children}
+            <CallProvider>
+              <ToastProvider />
+              {children}
+            </CallProvider>
           </SessionProvider>
         </SmoothScroll>
       </body>
