@@ -379,8 +379,8 @@ function LoginContent() {
               </div>
               <Button
                 onClick={handleGuestLogin}
-                variant="secondary"
-                className="w-full py-6 text-base"
+                variant="primary"
+                className="w-full py-6 text-base font-semibold shadow-lg hover:shadow-xl transition-all"
                 disabled={isLoading}
               >
                 Continue as Guest
