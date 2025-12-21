@@ -7,6 +7,10 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "DevConnect - Real-time Social Platform",
   description: "Connect, share, and engage with developers in real-time",
+  icons: {
+    icon: "/icon.svg",
+    apple: "/apple-icon.svg",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

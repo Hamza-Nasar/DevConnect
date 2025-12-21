@@ -1,0 +1,17 @@
+<svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="logoGradientApple" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#9333EA;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2563EB;stop-opacity:1" />
+    </linearGradient>
+    <filter id="blurApple">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="4"/>
+    </filter>
+  </defs>
+  <!-- Blur effect background (like absolute inset-0 blur opacity-75) -->
+  <rect x="0" y="0" width="180" height="180" rx="40" fill="url(#logoGradientApple)" opacity="0.75" filter="url(#blurApple)"/>
+  <!-- Main gradient box (like relative div with padding) -->
+  <rect x="22" y="22" width="136" height="136" rx="30" fill="url(#logoGradientApple)"/>
+  <!-- Zap icon (centered, white) -->
+  <path d="M90 45 L67.5 90 L90 90 L90 135 L112.5 90 L90 90 Z" fill="white" stroke="white" stroke-width="2" stroke-linejoin="round"/>
+</svg>
