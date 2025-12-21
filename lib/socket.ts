@@ -12,19 +12,32 @@ export const getSocket = (): CustomSocket | null => {
   if (!socket) {
     const origin = window.location.origin.replace(/\/$/, "");
     const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || origin;
+    const isVercel = typeof window !== "undefined" && window.location.hostname.includes("vercel.app");
+    const isRailway = typeof window !== "undefined" && window.location.hostname.includes("railway.app");
+
+    if (isVercel && !process.env.NEXT_PUBLIC_SOCKET_URL) {
+      console.warn("⚠️ [Client] Detected Vercel deployment without NEXT_PUBLIC_SOCKET_URL. Note that Vercel serverless functions cannot host Socket.io servers. If your server is on Railway, set NEXT_PUBLIC_SOCKET_URL to your Railway app URL.");
+    }
+
+    if (isRailway) {
+      console.log("🚂 [Client] Detected Railway deployment. WebSockets should be fully supported.");
+    }
 
     console.log("🔌 [Client] Initializing Socket...", { url: socketUrl, path: "/socket.io-custom" });
 
     socket = io(socketUrl, {
       path: "/socket.io-custom",
-      transports: ["polling", "websocket"], // Priority: Polling (more compatible with Vercel)
+      transports: ["websocket", "polling"], // WebSocket priority
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-      timeout: 20000,
+      timeout: 30000,
       withCredentials: true,
       autoConnect: true,
+      // Add extra options for more stability
+      rememberUpgrade: true,
+      forceNew: false,
     }) as CustomSocket;
 
     // Diagnostics for Vercel debugging
@@ -62,10 +75,11 @@ export const getSocket = (): CustomSocket | null => {
       console.log("🔌 [Client] DISCONNECTED:", reason);
       if (heartbeatInterval) clearInterval(heartbeatInterval);
 
-      if (reason === "io server disconnect" || reason === "transport close") {
-        // the disconnection was initiated by the server, you need to reconnect manually
+      if (reason === "io server disconnect") {
+        // Only manually reconnect if the server explicitly kicked us (socket.disconnect() on server)
         socket?.connect();
       }
+      // "transport close" and others are handled by auto-reconnection
     });
 
     // Handle visibility change to recover connection
@@ -80,12 +94,14 @@ export const getSocket = (): CustomSocket | null => {
       });
     }
 
-    // Debug: log ALL incoming events
-    socket.onAny((eventName, ...args) => {
-      if (eventName !== "pong_heartbeat") { // reduce noise
-        console.log(`📥 [Client] Received Event: ${eventName}`, args);
-      }
-    });
+    // Debug: log ALL incoming events in development
+    if (process.env.NODE_ENV === "development") {
+      socket.onAny((eventName, ...args) => {
+        if (eventName !== "pong_heartbeat") { // reduce noise
+          console.log(`📥 [Client] Received Event: ${eventName}`, args);
+        }
+      });
+    }
   }
 
   return socket;
