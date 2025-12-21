@@ -176,25 +176,25 @@ export default function CodeSnippetsPage() {
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
       <Navbar />
       <div className="pt-16 lg:pl-72 xl:pl-80">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
           {/* Header */}
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-4">
+          <div className="mb-6 sm:mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
               <div>
-                <h1 className="text-3xl font-bold text-white mb-2 flex items-center gap-2">
-                  <Code className="h-8 w-8 text-purple-400" />
+                <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2 flex items-center gap-2">
+                  <Code className="h-6 w-6 sm:h-8 sm:w-8 text-purple-400" />
                   Code Snippets
                 </h1>
-                <p className="text-gray-400">Share and discover code snippets</p>
+                <p className="text-sm sm:text-base text-gray-400">Share and discover code snippets</p>
               </div>
-              <Button variant="primary" onClick={() => setShowCreateModal(true)}>
+              <Button variant="primary" onClick={() => setShowCreateModal(true)} className="w-full sm:w-auto">
                 <Plus className="h-4 w-4 mr-2" />
                 Create Snippet
               </Button>
             </div>
 
             {/* Search and Filters */}
-            <div className="flex items-center gap-4">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
                 <Input
@@ -208,7 +208,7 @@ export default function CodeSnippetsPage() {
               <select
                 value={selectedLanguage}
                 onChange={(e) => setSelectedLanguage(e.target.value)}
-                className="px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white"
+                className="px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white w-full sm:w-auto"
               >
                 <option value="all">All Languages</option>
                 {languages.map((lang) => (
@@ -221,7 +221,7 @@ export default function CodeSnippetsPage() {
           </div>
 
           {/* Snippets Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
             {filteredSnippets.length === 0 ? (
               <Card variant="default" className="p-12 text-center col-span-full">
                 <Code className="h-12 w-12 mx-auto mb-4 opacity-50 text-gray-400" />
@@ -295,8 +295,8 @@ export default function CodeSnippetsPage() {
                     </div>
 
                     {/* Actions */}
-                    <div className="p-4 border-t border-gray-700/50 flex items-center justify-between">
-                      <div className="flex items-center gap-4 text-sm text-gray-400">
+                    <div className="p-4 border-t border-gray-700/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                      <div className="flex items-center flex-wrap gap-3 sm:gap-4 text-sm text-gray-400">
                         <button
                           onClick={() => handleLike(snippet.id)}
                           className="flex items-center gap-1 hover:text-red-400 transition"

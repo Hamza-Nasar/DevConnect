@@ -191,20 +191,20 @@ export default function CreatePostPage() {
 
       {/* Main Content - Centered with sidebar spacing */}
       <div className="pt-16 lg:pl-64">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="max-w-3xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8">
           {/* Header */}
-          <div className="mb-6">
+          <div className="mb-4 sm:mb-6">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => router.back()}
-              className="mb-4"
+              className="mb-3 sm:mb-4 text-sm sm:text-base"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
-            <h1 className="text-3xl font-bold text-foreground mb-2">Create Post</h1>
-            <p className="text-muted-foreground">Share your thoughts with the community</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">Create Post</h1>
+            <p className="text-sm sm:text-base text-muted-foreground">Share your thoughts with the community</p>
           </div>
 
           <motion.div
@@ -212,25 +212,26 @@ export default function CreatePostPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
           >
-            <Card variant="elevated" className="p-6">
+            <Card variant="elevated" className="p-4 sm:p-6">
               <form onSubmit={handleSubmit}>
-                <div className="flex gap-4 mb-6">
+                <div className="flex gap-3 sm:gap-4 mb-4 sm:mb-6">
                   <RealTimeAvatar
                     userId={session.user?.id}
                     src={session.user?.image}
                     alt={session.user?.name || "User"}
                     size="md"
                     status="online"
+                    className="flex-shrink-0"
                   />
-                  <div className="flex-1">
-                    <p className="font-semibold text-foreground">{session.user?.name || "User"}</p>
-                    <p className="text-sm text-muted-foreground">What's on your mind?</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-foreground text-sm sm:text-base truncate">{session.user?.name || "User"}</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground">What's on your mind?</p>
                   </div>
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   {/* Post Type Selector */}
-                  <div className="flex gap-2 flex-wrap">
+                  <div className="grid grid-cols-4 gap-1.5 sm:gap-2 sm:flex sm:flex-wrap">
                     {(["text", "poll", "story", "reel"] as const).map((type) => (
                       <Button
                         key={type}
@@ -238,13 +239,13 @@ export default function CreatePostPage() {
                         variant={postType === type ? "primary" : "outline"}
                         size="sm"
                         onClick={() => setPostType(type)}
-                        className="capitalize"
+                        className="w-full flex flex-col items-center gap-1 p-2 sm:p-3 h-auto transition-all group sm:flex-row sm:capitalize sm:text-xs sm:text-sm sm:px-2 sm:px-3 bg-secondary/30 hover:bg-secondary/60 border sm:border-0 rounded-lg"
                       >
-                        {type === "text" && <FileText className="h-4 w-4 mr-1" />}
-                        {type === "poll" && <PollIcon className="h-4 w-4 mr-1" />}
-                        {type === "story" && <Zap className="h-4 w-4 mr-1" />}
-                        {type === "reel" && <Film className="h-4 w-4 mr-1" />}
-                        {type}
+                        {type === "text" && <FileText className="h-4 w-4 sm:h-4 sm:w-4 text-primary group-hover:text-primary sm:mr-1" />}
+                        {type === "poll" && <PollIcon className="h-4 w-4 sm:h-4 sm:w-4 text-primary group-hover:text-primary sm:mr-1" />}
+                        {type === "story" && <Zap className="h-4 w-4 sm:h-4 sm:w-4 text-primary group-hover:text-primary sm:mr-1" />}
+                        {type === "reel" && <Film className="h-4 w-4 sm:h-4 sm:w-4 text-primary group-hover:text-primary sm:mr-1" />}
+                        <span className="text-[10px] sm:text-xs text-muted-foreground group-hover:text-foreground sm:text-foreground">{type}</span>
                       </Button>
                     ))}
                   </div>
@@ -266,7 +267,7 @@ export default function CreatePostPage() {
                       placeholder="What's on your mind?"
                       value={content}
                       onChange={(e) => setContent(e.target.value)}
-                      className="min-h-[200px] resize-none bg-secondary/50 border-input"
+                      className="min-h-[150px] sm:min-h-[200px] resize-none bg-secondary/50 border-input text-sm sm:text-base"
                     />
                   </div>
 
@@ -275,16 +276,17 @@ export default function CreatePostPage() {
                     <motion.div
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: "auto" }}
-                      className="space-y-3 p-4 bg-muted/30 rounded-xl border border-border"
+                      className="space-y-3 p-3 sm:p-4 bg-muted/30 rounded-lg sm:rounded-xl border border-border"
                     >
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="text-sm font-medium text-muted-foreground">Poll Options</span>
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-3">
+                        <span className="text-xs sm:text-sm font-medium text-muted-foreground">Poll Options</span>
                         <Button
                           type="button"
                           variant="ghost"
                           size="sm"
                           onClick={addPollOption}
                           disabled={pollOptions.length >= 6}
+                          className="text-xs sm:text-sm w-full sm:w-auto"
                         >
                           + Add Option
                         </Button>
@@ -300,7 +302,7 @@ export default function CreatePostPage() {
                               newOptions[index] = e.target.value;
                               setPollOptions(newOptions);
                             }}
-                            className="bg-secondary/50 border-input"
+                            className="bg-secondary/50 border-input text-sm sm:text-base"
                           />
                           {pollOptions.length > 2 && (
                             <Button
@@ -308,6 +310,7 @@ export default function CreatePostPage() {
                               variant="ghost"
                               size="icon"
                               onClick={() => removePollOption(index)}
+                              className="h-9 w-9 sm:h-10 sm:w-10"
                             >
                               <X className="h-4 w-4" />
                             </Button>
@@ -337,7 +340,7 @@ export default function CreatePostPage() {
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: "auto" }}
                         exit={{ opacity: 0, height: 0 }}
-                        className="grid grid-cols-2 md:grid-cols-3 gap-3"
+                        className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3"
                       >
                         {images.map((img, index) => (
                           <motion.div
@@ -349,7 +352,7 @@ export default function CreatePostPage() {
                             <img
                               src={img}
                               alt={`Upload ${index + 1}`}
-                              className="w-full h-32 object-cover rounded-lg"
+                              className="w-full h-24 sm:h-32 object-cover rounded-lg"
                             />
                             <button
                               type="button"
@@ -383,7 +386,7 @@ export default function CreatePostPage() {
                   )}
 
                   {/* Hashtag Input */}
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <Input
                       type="text"
                       placeholder="Add hashtag (e.g., #webdev)"
@@ -395,19 +398,20 @@ export default function CreatePostPage() {
                           addHashtag();
                         }
                       }}
-                      className="bg-secondary/50 border-input"
+                      className="bg-secondary/50 border-input text-sm sm:text-base flex-1"
                     />
                     <Button
                       type="button"
                       variant="outline"
                       onClick={addHashtag}
+                      className="w-full sm:w-auto text-sm sm:text-base"
                     >
                       Add
                     </Button>
                   </div>
 
                   {/* Quick Actions */}
-                  <div className="flex items-center gap-2 flex-wrap pt-4 border-t border-border">
+                  <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap pt-3 sm:pt-4 border-t border-border">
                     {quickActions.map((action, index) => (
                       <Button
                         key={index}
@@ -415,20 +419,21 @@ export default function CreatePostPage() {
                         variant="ghost"
                         size="sm"
                         onClick={action.action}
-                        className="text-muted-foreground hover:text-foreground"
+                        className="text-muted-foreground hover:text-foreground text-xs sm:text-sm px-2 sm:px-3"
                       >
-                        <action.icon className="h-4 w-4 mr-1" />
+                        <action.icon className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                         {action.label}
                       </Button>
                     ))}
                   </div>
 
                   {/* Submit Button */}
-                  <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
+                  <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 sm:gap-3 pt-3 sm:pt-4 border-t border-border">
                     <Button
                       type="button"
                       variant="outline"
                       onClick={() => router.back()}
+                      className="w-full sm:w-auto text-sm sm:text-base"
                     >
                       Cancel
                     </Button>
@@ -436,6 +441,7 @@ export default function CreatePostPage() {
                       type="submit"
                       variant="primary"
                       disabled={isPosting || (!content.trim() && images.length === 0 && postType !== "poll")}
+                      className="w-full sm:w-auto text-sm sm:text-base"
                     >
                       {isPosting ? (
                         <>

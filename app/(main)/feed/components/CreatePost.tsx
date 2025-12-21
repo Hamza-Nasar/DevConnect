@@ -212,56 +212,59 @@ export default function CreatePost() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
       >
-        <Card variant="elevated" hover={false} className="mb-6">
+        <Card variant="elevated" hover={false} className="mb-4 sm:mb-6">
           <form onSubmit={handleSubmit}>
-            <div className="flex gap-4">
+            <div className="flex gap-3 sm:gap-4">
               <RealTimeAvatar
                 userId={session.user?.id}
                 src={session.user?.image}
                 alt={session.user?.name || "User"}
                 size="md"
                 status="online"
+                className="flex-shrink-0"
               />
-              <div className="flex-1 space-y-4">
+              <div className="flex-1 space-y-3 sm:space-y-4 min-w-0">
                 <div className="space-y-2">
                   <input
                     type="text"
                     placeholder="Add a title (optional)"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-full px-3 sm:px-4 py-2 text-sm sm:text-base bg-gray-800/50 border border-gray-700 rounded-lg sm:rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
                   />
                   <Textarea
                     placeholder="What's on your mind?"
                     value={content}
                     onChange={(e) => handleContentChange(e.target.value)}
-                    className="min-h-[120px] resize-none bg-gray-800/50 border-gray-700"
+                    className="min-h-[100px] sm:min-h-[120px] resize-none bg-gray-800/50 border-gray-700 text-sm sm:text-base"
                   />
                 </div>
 
                 {/* Post Type Selector - Enhanced */}
-                <div className="flex gap-2 p-2 bg-gray-800/20 rounded-xl border border-gray-700/30">
+                <div className="grid grid-cols-4 gap-1.5 sm:gap-2 sm:flex sm:flex-wrap sm:p-2 sm:bg-gray-800/20 sm:rounded-lg sm:rounded-xl sm:border sm:border-gray-700/30">
                   {(["text", "poll", "story", "reel"] as const).map((type) => (
                     <motion.div
                       key={type}
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
+                      className="flex-shrink-0"
                     >
                       <Button
                         type="button"
                         variant={postType === type ? "primary" : "ghost"}
                         size="sm"
                         onClick={() => setPostType(type)}
-                        className={`capitalize transition-all ${postType === type
-                          ? "bg-gradient-to-r from-purple-600 to-blue-600 shadow-lg shadow-purple-500/20"
-                          : "hover:bg-gray-800/50"
-                          }`}
+                        className={`w-full flex flex-col items-center gap-1 p-2 sm:p-3 h-auto transition-all group sm:flex-row sm:capitalize sm:text-xs sm:text-sm sm:px-2 sm:px-3 ${
+                          postType === type
+                            ? "bg-gradient-to-r from-purple-600 to-blue-600 shadow-lg shadow-purple-500/20 border border-purple-500/50 sm:border-0"
+                            : "bg-gray-800/30 hover:bg-gray-800/60 border border-gray-700/50 hover:border-purple-500/50"
+                        } rounded-lg sm:rounded-xl`}
                       >
-                        {type === "text" && <FileText className="h-4 w-4 mr-1.5" />}
-                        {type === "poll" && <PollIcon className="h-4 w-4 mr-1.5" />}
-                        {type === "story" && <Zap className="h-4 w-4 mr-1.5" />}
-                        {type === "reel" && <Film className="h-4 w-4 mr-1.5" />}
-                        {type}
+                        {type === "text" && <FileText className="h-4 w-4 sm:h-4 sm:w-4 text-purple-400 group-hover:text-purple-300 sm:mr-1.5" />}
+                        {type === "poll" && <PollIcon className="h-4 w-4 sm:h-4 sm:w-4 text-purple-400 group-hover:text-purple-300 sm:mr-1.5" />}
+                        {type === "story" && <Zap className="h-4 w-4 sm:h-4 sm:w-4 text-purple-400 group-hover:text-purple-300 sm:mr-1.5" />}
+                        {type === "reel" && <Film className="h-4 w-4 sm:h-4 sm:w-4 text-purple-400 group-hover:text-purple-300 sm:mr-1.5" />}
+                        <span className="text-[10px] sm:text-xs text-gray-400 group-hover:text-white sm:text-white sm:group-hover:text-white">{type}</span>
                       </Button>
                     </motion.div>
                   ))}
@@ -272,16 +275,17 @@ export default function CreatePost() {
                   <motion.div
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: "auto" }}
-                    className="space-y-2 p-4 bg-gray-800/30 rounded-xl border border-gray-700/50"
+                    className="space-y-2 p-3 sm:p-4 bg-gray-800/30 rounded-lg sm:rounded-xl border border-gray-700/50"
                   >
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-gray-300">Poll Options</span>
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-2">
+                      <span className="text-xs sm:text-sm font-medium text-gray-300">Poll Options</span>
                       <Button
                         type="button"
                         variant="ghost"
                         size="sm"
                         onClick={addPollOption}
                         disabled={pollOptions.length >= 6}
+                        className="text-xs sm:text-sm w-full sm:w-auto"
                       >
                         + Add Option
                       </Button>
@@ -297,7 +301,7 @@ export default function CreatePost() {
                             newOptions[index] = e.target.value;
                             setPollOptions(newOptions);
                           }}
-                          className="flex-1 px-3 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          className="flex-1 px-3 py-2 text-sm sm:text-base bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
                         />
                         {pollOptions.length > 2 && (
                           <Button
@@ -305,6 +309,7 @@ export default function CreatePost() {
                             variant="ghost"
                             size="icon"
                             onClick={() => removePollOption(index)}
+                            className="h-9 w-9 sm:h-10 sm:w-10"
                           >
                             <X className="h-4 w-4" />
                           </Button>
@@ -392,7 +397,7 @@ export default function CreatePost() {
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: "auto" }}
                       exit={{ opacity: 0, height: 0 }}
-                      className="grid grid-cols-2 md:grid-cols-3 gap-2"
+                      className="grid grid-cols-2 sm:grid-cols-3 gap-2"
                     >
                       {images.map((img, index) => (
                         <motion.div
@@ -404,7 +409,7 @@ export default function CreatePost() {
                           <img
                             src={img}
                             alt={`Upload ${index + 1}`}
-                            className="w-full h-32 object-cover rounded-lg"
+                            className="w-full h-24 sm:h-32 object-cover rounded-lg"
                           />
                           <button
                             type="button"
@@ -511,11 +516,11 @@ export default function CreatePost() {
                 )}
 
                 {/* Quick Actions - Enhanced Design */}
-                <div className="pt-4 border-t border-gray-700/50">
-                  <div className="flex items-center justify-between gap-4">
+                <div className="pt-3 sm:pt-4 border-t border-gray-700/50">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
                     {/* Action Buttons - Grouped by Category */}
-                    <div className="flex-1">
-                      <div className="grid grid-cols-4 sm:grid-cols-4 md:grid-cols-8 gap-2">
+                    <div className="flex-1 w-full sm:w-auto">
+                      <div className="grid grid-cols-4 sm:grid-cols-4 md:grid-cols-8 gap-1.5 sm:gap-2">
                         {/* Media Actions */}
                         <motion.div
                           whileHover={{ scale: 1.05 }}
@@ -526,10 +531,10 @@ export default function CreatePost() {
                             variant="ghost"
                             size="sm"
                             onClick={() => fileInputRef.current?.click()}
-                            className="w-full flex flex-col items-center gap-1.5 p-3 h-auto bg-gray-800/30 hover:bg-gray-800/60 border border-gray-700/50 hover:border-purple-500/50 rounded-xl transition-all group"
+                            className="w-full flex flex-col items-center gap-1 p-2 sm:p-3 h-auto bg-gray-800/30 hover:bg-gray-800/60 border border-gray-700/50 hover:border-purple-500/50 rounded-lg sm:rounded-xl transition-all group"
                           >
-                            <ImageIcon className="h-5 w-5 text-blue-400 group-hover:text-blue-300" />
-                            <span className="text-xs text-gray-400 group-hover:text-white">Photo</span>
+                            <ImageIcon className="h-4 w-4 sm:h-5 sm:w-5 text-blue-400 group-hover:text-blue-300" />
+                            <span className="text-[10px] sm:text-xs text-gray-400 group-hover:text-white">Photo</span>
                           </Button>
                         </motion.div>
 
@@ -542,10 +547,10 @@ export default function CreatePost() {
                             variant="ghost"
                             size="sm"
                             onClick={() => fileInputRef.current?.click()}
-                            className="w-full flex flex-col items-center gap-1.5 p-3 h-auto bg-gray-800/30 hover:bg-gray-800/60 border border-gray-700/50 hover:border-red-500/50 rounded-xl transition-all group"
+                            className="w-full flex flex-col items-center gap-1 p-2 sm:p-3 h-auto bg-gray-800/30 hover:bg-gray-800/60 border border-gray-700/50 hover:border-red-500/50 rounded-lg sm:rounded-xl transition-all group"
                           >
-                            <Video className="h-5 w-5 text-red-400 group-hover:text-red-300" />
-                            <span className="text-xs text-gray-400 group-hover:text-white">Video</span>
+                            <Video className="h-4 w-4 sm:h-5 sm:w-5 text-red-400 group-hover:text-red-300" />
+                            <span className="text-[10px] sm:text-xs text-gray-400 group-hover:text-white">Video</span>
                           </Button>
                         </motion.div>
 
@@ -559,13 +564,13 @@ export default function CreatePost() {
                             variant="ghost"
                             size="sm"
                             onClick={() => setPostType("poll")}
-                            className={`w-full flex flex-col items-center gap-1.5 p-3 h-auto border rounded-xl transition-all group ${postType === "poll"
+                            className={`w-full flex flex-col items-center gap-1 p-2 sm:p-3 h-auto border rounded-lg sm:rounded-xl transition-all group ${postType === "poll"
                               ? "bg-purple-600/20 border-purple-500/50"
                               : "bg-gray-800/30 hover:bg-gray-800/60 border-gray-700/50 hover:border-purple-500/50"
                               }`}
                           >
-                            <PollIcon className={`h-5 w-5 ${postType === "poll" ? "text-purple-400" : "text-purple-400 group-hover:text-purple-300"}`} />
-                            <span className={`text-xs ${postType === "poll" ? "text-purple-300" : "text-gray-400 group-hover:text-white"}`}>Poll</span>
+                            <PollIcon className={`h-4 w-4 sm:h-5 sm:w-5 ${postType === "poll" ? "text-purple-400" : "text-purple-400 group-hover:text-purple-300"}`} />
+                            <span className={`text-[10px] sm:text-xs ${postType === "poll" ? "text-purple-300" : "text-gray-400 group-hover:text-white"}`}>Poll</span>
                           </Button>
                         </motion.div>
 
@@ -578,10 +583,10 @@ export default function CreatePost() {
                             variant="ghost"
                             size="sm"
                             onClick={() => setShowHashtagInput(true)}
-                            className="w-full flex flex-col items-center gap-1.5 p-3 h-auto bg-gray-800/30 hover:bg-gray-800/60 border border-gray-700/50 hover:border-blue-500/50 rounded-xl transition-all group"
+                            className="w-full flex flex-col items-center gap-1 p-2 sm:p-3 h-auto bg-gray-800/30 hover:bg-gray-800/60 border border-gray-700/50 hover:border-blue-500/50 rounded-lg sm:rounded-xl transition-all group"
                           >
-                            <Hash className="h-5 w-5 text-blue-400 group-hover:text-blue-300" />
-                            <span className="text-xs text-gray-400 group-hover:text-white">Tag</span>
+                            <Hash className="h-4 w-4 sm:h-5 sm:w-5 text-blue-400 group-hover:text-blue-300" />
+                            <span className="text-[10px] sm:text-xs text-gray-400 group-hover:text-white">Tag</span>
                           </Button>
                         </motion.div>
 
@@ -617,16 +622,16 @@ export default function CreatePost() {
                                 setShowLocationPicker(true);
                               }
                             }}
-                            className={`w-full flex flex-col items-center gap-1.5 p-3 h-auto border rounded-xl transition-all group ${location
+                            className={`w-full flex flex-col items-center gap-1 p-2 sm:p-3 h-auto border rounded-lg sm:rounded-xl transition-all group ${location
                               ? "bg-green-600/20 border-green-500/50"
                               : "bg-gray-800/30 hover:bg-gray-800/60 border-gray-700/50 hover:border-green-500/50"
                               }`}
                           >
-                            <MapPin className={`h-5 w-5 ${location ? "text-green-400" : "text-green-400 group-hover:text-green-300"}`} />
-                            <span className={`text-xs ${location ? "text-green-300" : "text-gray-400 group-hover:text-white"}`}>Location</span>
+                            <MapPin className={`h-4 w-4 sm:h-5 sm:w-5 ${location ? "text-green-400" : "text-green-400 group-hover:text-green-300"}`} />
+                            <span className={`text-[10px] sm:text-xs ${location ? "text-green-300" : "text-gray-400 group-hover:text-white"}`}>Location</span>
                           </Button>
                           {showLocationPicker && (
-                            <div className="absolute bottom-full left-0 mb-2 w-64 bg-gray-800 rounded-lg border border-gray-700 p-3 z-10">
+                            <div className="absolute bottom-full left-0 mb-2 w-64 sm:w-80 bg-gray-800 rounded-lg border border-gray-700 p-3 z-10">
                               <Input
                                 type="text"
                                 placeholder="Enter location..."
@@ -675,10 +680,10 @@ export default function CreatePost() {
                             variant="ghost"
                             size="sm"
                             onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                            className="w-full flex flex-col items-center gap-1.5 p-3 h-auto bg-gray-800/30 hover:bg-gray-800/60 border border-gray-700/50 hover:border-yellow-500/50 rounded-xl transition-all group"
+                            className="w-full flex flex-col items-center gap-1 p-2 sm:p-3 h-auto bg-gray-800/30 hover:bg-gray-800/60 border border-gray-700/50 hover:border-yellow-500/50 rounded-lg sm:rounded-xl transition-all group"
                           >
-                            <Smile className="h-5 w-5 text-yellow-400 group-hover:text-yellow-300" />
-                            <span className="text-xs text-gray-400 group-hover:text-white">Emoji</span>
+                            <Smile className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-400 group-hover:text-yellow-300" />
+                            <span className="text-[10px] sm:text-xs text-gray-400 group-hover:text-white">Emoji</span>
                           </Button>
                           <AnimatePresence>
                             {showEmojiPicker && (
@@ -704,10 +709,10 @@ export default function CreatePost() {
                             variant="ghost"
                             size="sm"
                             onClick={() => setShowGifPicker(!showGifPicker)}
-                            className="w-full flex flex-col items-center gap-1.5 p-3 h-auto bg-gray-800/30 hover:bg-gray-800/60 border border-gray-700/50 hover:border-pink-500/50 rounded-xl transition-all group"
+                            className="w-full flex flex-col items-center gap-1 p-2 sm:p-3 h-auto bg-gray-800/30 hover:bg-gray-800/60 border border-gray-700/50 hover:border-pink-500/50 rounded-lg sm:rounded-xl transition-all group"
                           >
-                            <FileImage className="h-5 w-5 text-pink-400 group-hover:text-pink-300" />
-                            <span className="text-xs text-gray-400 group-hover:text-white">GIF</span>
+                            <FileImage className="h-4 w-4 sm:h-5 sm:w-5 text-pink-400 group-hover:text-pink-300" />
+                            <span className="text-[10px] sm:text-xs text-gray-400 group-hover:text-white">GIF</span>
                           </Button>
                           {showGifPicker && (
                             <GifPicker
@@ -731,10 +736,10 @@ export default function CreatePost() {
                             variant="ghost"
                             size="sm"
                             onClick={() => setShowLinkInput(!showLinkInput)}
-                            className="w-full flex flex-col items-center gap-1.5 p-3 h-auto bg-gray-800/30 hover:bg-gray-800/60 border border-gray-700/50 hover:border-cyan-500/50 rounded-xl transition-all group"
+                            className="w-full flex flex-col items-center gap-1 p-2 sm:p-3 h-auto bg-gray-800/30 hover:bg-gray-800/60 border border-gray-700/50 hover:border-cyan-500/50 rounded-lg sm:rounded-xl transition-all group"
                           >
-                            <LinkIcon className="h-5 w-5 text-cyan-400 group-hover:text-cyan-300" />
-                            <span className="text-xs text-gray-400 group-hover:text-white">Link</span>
+                            <LinkIcon className="h-4 w-4 sm:h-5 sm:w-5 text-cyan-400 group-hover:text-cyan-300" />
+                            <span className="text-[10px] sm:text-xs text-gray-400 group-hover:text-white">Link</span>
                           </Button>
                           {showLinkInput && (
                             <div className="absolute bottom-full left-0 mb-2 w-80 bg-gray-800 rounded-lg border border-gray-700 p-3 z-10">
@@ -807,6 +812,7 @@ export default function CreatePost() {
                     <motion.div
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
+                      className="w-full sm:w-auto"
                     >
                       <Button
                         type="submit"
@@ -814,7 +820,7 @@ export default function CreatePost() {
                         size="lg"
                         loading={isPosting}
                         disabled={isPosting || (!content.trim() && images.length === 0 && postType !== "poll")}
-                        className="px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/20 rounded-xl font-semibold"
+                        className="w-full sm:w-auto px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg shadow-purple-500/20 rounded-lg sm:rounded-xl font-semibold text-sm sm:text-base"
                       >
                         {isPosting ? (
                           <>

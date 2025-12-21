@@ -178,25 +178,25 @@ export default function GroupsPage() {
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
       <Navbar />
       <div className="pt-16 lg:pl-72 xl:pl-80">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
           {/* Header */}
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-4">
+          <div className="mb-6 sm:mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
               <div>
-                <h1 className="text-3xl font-bold text-white mb-2 flex items-center gap-2">
-                  <Users className="h-8 w-8 text-blue-400" />
+                <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2 flex items-center gap-2">
+                  <Users className="h-6 w-6 sm:h-8 sm:w-8 text-blue-400" />
                   Groups
                 </h1>
-                <p className="text-gray-400">Join communities and connect with like-minded people</p>
+                <p className="text-sm sm:text-base text-gray-400">Join communities and connect with like-minded people</p>
               </div>
-              <Button variant="primary" onClick={() => setShowCreateModal(true)}>
+              <Button variant="primary" onClick={() => setShowCreateModal(true)} className="w-full sm:w-auto">
                 <Plus className="h-4 w-4 mr-2" />
                 Create Group
               </Button>
             </div>
 
             {/* Search and Filters */}
-            <div className="flex items-center gap-4">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
                 <Input
@@ -210,7 +210,7 @@ export default function GroupsPage() {
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
-                className="px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white"
+                className="px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white w-full sm:w-auto"
               >
                 {categories.map((cat) => (
                   <option key={cat} value={cat}>
@@ -222,7 +222,7 @@ export default function GroupsPage() {
           </div>
 
           {/* Groups Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {filteredGroups.length === 0 ? (
               <Card variant="default" className="p-12 text-center col-span-full">
                 <Users className="h-12 w-12 mx-auto mb-4 opacity-50 text-gray-400" />
@@ -250,24 +250,24 @@ export default function GroupsPage() {
                       <div className="h-32 bg-gradient-to-r from-blue-600 to-purple-600" />
                     )}
 
-                    <div className="p-6">
+                    <div className="p-4 sm:p-6">
                       {/* Avatar and Name */}
-                      <div className="flex items-start gap-4 mb-4">
-                        <div className="relative -mt-12">
+                      <div className="flex items-start gap-3 sm:gap-4 mb-4">
+                        <div className="relative -mt-12 flex-shrink-0">
                           <Avatar
                             src={group.avatar}
                             alt={group.name}
                             size="xl"
                           />
                           {group.isPrivate && (
-                            <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-gray-900 rounded-full flex items-center justify-center border-2 border-gray-800">
-                              <Lock className="h-3 w-3 text-gray-400" />
+                            <div className="absolute -bottom-1 -right-1 w-5 h-5 sm:w-6 sm:h-6 bg-gray-900 rounded-full flex items-center justify-center border-2 border-gray-800">
+                              <Lock className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-gray-400" />
                             </div>
                           )}
                         </div>
-                        <div className="flex-1 mt-2">
-                          <h3 className="font-bold text-white text-lg mb-1">{group.name}</h3>
-                          <div className="flex items-center gap-2">
+                        <div className="flex-1 mt-2 min-w-0">
+                          <h3 className="font-bold text-white text-base sm:text-lg mb-1 truncate">{group.name}</h3>
+                          <div className="flex items-center flex-wrap gap-2">
                             <Badge variant="outline" className="text-xs">
                               {group.category}
                             </Badge>
@@ -310,7 +310,7 @@ export default function GroupsPage() {
                       </div>
 
                       {/* Actions */}
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                         {group.isMember ? (
                           <>
                             <Button
@@ -321,24 +321,30 @@ export default function GroupsPage() {
                             >
                               View Group
                             </Button>
-                            {!group.isAdmin && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleLeaveGroup(group.id)}
-                              >
-                                <UserMinus className="h-4 w-4" />
-                              </Button>
-                            )}
-                            {group.isAdmin && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => router.push(`/groups/${group.id}/settings`)}
-                              >
-                                <Settings className="h-4 w-4" />
-                              </Button>
-                            )}
+                            <div className="flex items-center gap-2">
+                              {!group.isAdmin && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleLeaveGroup(group.id)}
+                                  className="flex-1 sm:flex-initial"
+                                >
+                                  <UserMinus className="h-4 w-4 sm:mr-0" />
+                                  <span className="sm:hidden ml-2">Leave</span>
+                                </Button>
+                              )}
+                              {group.isAdmin && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => router.push(`/groups/${group.id}/settings`)}
+                                  className="flex-1 sm:flex-initial"
+                                >
+                                  <Settings className="h-4 w-4 sm:mr-0" />
+                                  <span className="sm:hidden ml-2">Settings</span>
+                                </Button>
+                              )}
+                            </div>
                           </>
                         ) : (
                           <Button

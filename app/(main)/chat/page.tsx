@@ -1212,8 +1212,8 @@ export default function ChatPage() {
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
       <Navbar />
       <div className="pt-16 lg:pl-72 xl:pl-80">
-        <div className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 py-4 lg:py-8">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-8rem)] lg:h-[calc(100vh-12rem)]">
+        <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-2 sm:py-4 lg:py-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6 h-[calc(100vh-6rem)] sm:h-[calc(100vh-8rem)] lg:h-[calc(100vh-12rem)]">
             {/* Chat List - Enhanced Design */}
             <Card variant="elevated" className={`lg:col-span-1 overflow-hidden flex flex-col ${selectedChat ? "hidden lg:flex" : "flex"}`}>
               <div className="p-4 border-b border-gray-700/50 bg-gradient-to-r from-purple-600/10 to-blue-600/10">
@@ -1365,19 +1365,19 @@ export default function ChatPage() {
               {selectedChat ? (
                 <>
                   {/* Chat Header - Enhanced */}
-                  <div className="p-4 border-b border-gray-700/50 bg-gradient-to-r from-purple-600/10 to-blue-600/10 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                  <div className="p-3 sm:p-4 border-b border-gray-700/50 bg-gradient-to-r from-purple-600/10 to-blue-600/10 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => setSelectedChat(null)}
-                        className="lg:hidden"
+                        className="lg:hidden flex-shrink-0"
                       >
                         <ArrowLeft className="h-5 w-5" />
                       </Button>
                       <Link
                         href={`/profile/${selectedChat.user.username || selectedChat.userId}`}
-                        className="flex items-center gap-3 hover:opacity-80 transition"
+                        className="flex items-center gap-2 sm:gap-3 hover:opacity-80 transition min-w-0 flex-1"
                       >
                         <RealTimeAvatar
                           userId={selectedChat.user.id}
@@ -1386,26 +1386,27 @@ export default function ChatPage() {
                           size="md"
                           status={selectedChat.user.status || "offline"}
                           alternativeIds={selectedChat.user.alternativeIds}
+                          className="flex-shrink-0"
                         />
-                        <div>
+                        <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
-                            <h3 className="font-semibold text-foreground">
+                            <h3 className="font-semibold text-foreground truncate text-sm sm:text-base">
                               {selectedChat.user.name || "Unknown"}
                             </h3>
                             {selectedChat.user.verified && (
-                              <Badge variant="success" className="text-xs">Verified</Badge>
+                              <Badge variant="success" className="text-xs flex-shrink-0">Verified</Badge>
                             )}
                           </div>
                           <div className="flex items-center gap-2">
                             <div
-                              className={`w-2 h-2 rounded-full ${selectedChat.user.status === "online"
+                              className={`w-2 h-2 rounded-full flex-shrink-0 ${selectedChat.user.status === "online"
                                 ? "bg-green-500 animate-pulse"
                                 : selectedChat.user.status === "away"
                                   ? "bg-yellow-500"
                                   : "bg-muted-foreground"
                                 }`}
                             />
-                            <p className="text-sm text-muted-foreground">
+                            <p className="text-xs sm:text-sm text-muted-foreground truncate">
                               {selectedChat.user.status === "online"
                                 ? "Online"
                                 : selectedChat.user.status === "away"
@@ -1418,33 +1419,33 @@ export default function ChatPage() {
                         </div>
                       </Link>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => callUser(selectedChat.userId, false)}
-                        className="hover:bg-green-500/10"
+                        className="hover:bg-green-500/10 h-8 w-8 sm:h-10 sm:w-10"
                         title="Voice Call"
                       >
-                        <Phone className="h-5 w-5 text-green-500" />
+                        <Phone className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => callUser(selectedChat.userId, true)}
-                        className="hover:bg-blue-500/10"
+                        className="hover:bg-blue-500/10 h-8 w-8 sm:h-10 sm:w-10"
                         title="Video Call"
                       >
-                        <Video className="h-5 w-5 text-blue-500" />
+                        <Video className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />
                       </Button>
-                      <Button variant="ghost" size="icon">
-                        <MoreVertical className="h-5 w-5" />
+                      <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-10 sm:w-10 hidden sm:flex">
+                        <MoreVertical className="h-4 w-4 sm:h-5 sm:w-5" />
                       </Button>
                     </div>
                   </div>
 
                   {/* Messages - Enhanced */}
-                  <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-background/50 custom-scrollbar">
+                  <div className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6 space-y-3 sm:space-y-4 bg-background/50 custom-scrollbar">
                     <AnimatePresence>
                       {messages.map((message, index) => {
                         const isOwn = message.senderId === session?.user?.id;
@@ -1467,7 +1468,7 @@ export default function ChatPage() {
                             className={`flex ${isOwn ? "justify-end" : "justify-start"} ${showTime ? "mb-4" : ""
                               }`}
                           >
-                            <div className={`flex items-end gap-2 max-w-[85%] lg:max-w-[75%] ${isOwn ? "flex-row-reverse" : "flex-row"}`}>
+                            <div className={`flex items-end gap-1.5 sm:gap-2 max-w-[90%] sm:max-w-[85%] lg:max-w-[75%] ${isOwn ? "flex-row-reverse" : "flex-row"}`}>
                               {showAvatar && !isOwn && (
                                 <RealTimeAvatar
                                   userId={message.sender?.id}
@@ -1560,8 +1561,8 @@ export default function ChatPage() {
                   </div>
 
                   {/* Message Input - Enhanced */}
-                  <div className="p-4 border-t border-gray-700/50 bg-gray-900/50">
-                    <div className="flex items-end gap-2">
+                  <div className="p-2 sm:p-4 border-t border-gray-700/50 bg-gray-900/50">
+                    <div className="flex items-end gap-1.5 sm:gap-2">
                       <div className="relative">
                         <Button
                           variant="ghost"

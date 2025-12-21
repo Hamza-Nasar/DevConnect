@@ -88,19 +88,19 @@ export default function ExplorePage() {
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
       <Navbar />
       <div className="pt-16 lg:pl-72 xl:pl-80">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
           {/* Header */}
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-4">
+          <div className="mb-6 sm:mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
               <div>
-                <h1 className="text-3xl font-bold text-white mb-2 flex items-center gap-2">
-                  <Search className="h-8 w-8 text-purple-400" />
+                <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2 flex items-center gap-2">
+                  <Search className="h-6 w-6 sm:h-8 sm:w-8 text-purple-400" />
                   Explore
                 </h1>
-                <p className="text-gray-400">Discover trending content, hashtags, and creators</p>
+                <p className="text-sm sm:text-base text-gray-400">Discover trending content, hashtags, and creators</p>
               </div>
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" className="w-full sm:w-auto">
                   <Filter className="h-4 w-4 mr-2" />
                   Filters
                 </Button>
@@ -121,32 +121,44 @@ export default function ExplorePage() {
           </div>
 
           {/* Tabs */}
-          <Tabs defaultValue="trending" className="mb-6">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="trending">
-                <TrendingUp className="h-4 w-4 mr-2" />
-                Trending
+          <Tabs defaultValue="trending" className="mb-4 sm:mb-6">
+            <TabsList className="w-full flex sm:grid sm:grid-cols-4 gap-1.5 sm:gap-2 overflow-x-auto scrollbar-hide p-1 bg-gray-800/30 rounded-lg sm:rounded-xl border border-gray-700/30">
+              <TabsTrigger 
+                value="trending" 
+                className="flex-shrink-0 flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm min-w-[80px] sm:min-w-0"
+              >
+                <TrendingUp className="h-4 w-4 sm:h-4 sm:w-4 flex-shrink-0" />
+                <span className="whitespace-nowrap">Trending</span>
               </TabsTrigger>
-              <TabsTrigger value="hashtags">
-                <Hash className="h-4 w-4 mr-2" />
-                Hashtags
+              <TabsTrigger 
+                value="hashtags" 
+                className="flex-shrink-0 flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm min-w-[80px] sm:min-w-0"
+              >
+                <Hash className="h-4 w-4 sm:h-4 sm:w-4 flex-shrink-0" />
+                <span className="whitespace-nowrap">Hashtags</span>
               </TabsTrigger>
-              <TabsTrigger value="users">
-                <Users className="h-4 w-4 mr-2" />
-                Creators
+              <TabsTrigger 
+                value="users" 
+                className="flex-shrink-0 flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm min-w-[80px] sm:min-w-0"
+              >
+                <Users className="h-4 w-4 sm:h-4 sm:w-4 flex-shrink-0" />
+                <span className="whitespace-nowrap">Creators</span>
               </TabsTrigger>
-              <TabsTrigger value="latest">
-                <Clock className="h-4 w-4 mr-2" />
-                Latest
+              <TabsTrigger 
+                value="latest" 
+                className="flex-shrink-0 flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm min-w-[80px] sm:min-w-0"
+              >
+                <Clock className="h-4 w-4 sm:h-4 sm:w-4 flex-shrink-0" />
+                <span className="whitespace-nowrap">Latest</span>
               </TabsTrigger>
             </TabsList>
 
             {/* Trending Content */}
-            <TabsContent value="trending" className="mt-6">
+            <TabsContent value="trending" className="mt-4 sm:mt-6">
               {trendingPosts.length === 0 ? (
                 <div className="text-center text-gray-400 py-10">No trending posts yet.</div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                   {trendingPosts.map((post) => (
                     <Card key={post.id} variant="elevated" hover className="cursor-pointer">
                       <div className="flex items-start gap-3 mb-3">
@@ -186,11 +198,11 @@ export default function ExplorePage() {
             </TabsContent>
 
             {/* Trending Hashtags */}
-            <TabsContent value="hashtags" className="mt-6">
+            <TabsContent value="hashtags" className="mt-4 sm:mt-6">
               {trendingHashtags.length === 0 ? (
                 <div className="text-center text-gray-400 py-10">No trending hashtags yet.</div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   {trendingHashtags.map((hashtag) => (
                     <Card
                       key={hashtag.tag}
@@ -220,11 +232,11 @@ export default function ExplorePage() {
             </TabsContent>
 
             {/* Trending Users */}
-            <TabsContent value="users" className="mt-6">
+            <TabsContent value="users" className="mt-4 sm:mt-6">
               {trendingUsers.length === 0 ? (
                 <div className="text-center text-gray-400 py-10">No trending creators yet.</div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                   {trendingUsers.map((user) => (
                     <Card key={user.id} variant="elevated" hover className="cursor-pointer">
                       <div className="flex items-center gap-4">
@@ -258,11 +270,11 @@ export default function ExplorePage() {
             </TabsContent>
 
             {/* Latest Content */}
-            <TabsContent value="latest" className="mt-6">
+            <TabsContent value="latest" className="mt-4 sm:mt-6">
               {latestPosts.length === 0 ? (
                 <div className="text-center text-gray-400 py-10">No recent posts.</div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   {latestPosts.map((post) => (
                     <Card key={post.id} variant="elevated" hover className="cursor-pointer">
                       <div className="flex gap-4">
