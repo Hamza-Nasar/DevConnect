@@ -17,7 +17,9 @@ export function initializeSocket(server: HTTPServer) {
       credentials: true,
     },
     path: "/socket.io-custom",
-    addTrailingSlash: false,
+    addTrailingSlash: true,
+    transports: ["polling", "websocket"],
+    allowEIO3: true,
   });
 
   // Make socket instance globally accessible

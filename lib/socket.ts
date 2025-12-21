@@ -8,10 +8,16 @@ let socket: CustomSocket | null = null;
 
 export const getSocket = (): CustomSocket | null => {
   if (typeof window === "undefined") return null;
-
+  
   if (!socket) {
     const origin = typeof window !== "undefined" ? window.location.origin.replace(/\/$/, "") : "";
-    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || origin;
+    let socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || origin;
+
+    // Ensure socketUrl has protocol
+    if (socketUrl && !socketUrl.startsWith("http")) {
+      socketUrl = (typeof window !== "undefined" && window.location.protocol === "https:" ? "https://" : "http://") + socketUrl;
+    }
+
     const isVercel = typeof window !== "undefined" && window.location?.hostname?.includes("vercel.app");
     const isRailway = typeof window !== "undefined" && window.location?.hostname?.includes("railway.app");
 
@@ -27,7 +33,7 @@ export const getSocket = (): CustomSocket | null => {
 
     socket = io(socketUrl, {
       path: "/socket.io-custom",
-      transports: ["websocket", "polling"], // WebSocket priority
+      transports: ["polling", "websocket"], // Use polling first for better compatibility with Railway/proxies
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
