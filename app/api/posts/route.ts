@@ -2,13 +2,13 @@ import { getServerSession } from "next-auth/next";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import {
-  createPost,
-  findPosts,
-  findUserByEmail,
-  findUserById,
-  updateUser,
-  toObjectId,
-  toStringId,
+    createPost,
+    findPosts,
+    findUserByEmail,
+    findUserById,
+    updateUser,
+    toObjectId,
+    toStringId,
 } from "@/lib/db";
 import { getCollection } from "@/lib/mongodb";
 import { COLLECTIONS } from "@/lib/db";
@@ -122,6 +122,7 @@ export async function POST(req: Request) {
             likedByUser: false,
             sharedByUser: false,
             isPublic: post?.isPublic !== false,
+            codeSnippet: post?.codeSnippet || null,
         };
 
         // Emit real-time post creation event via Socket.io
@@ -152,7 +153,7 @@ export async function POST(req: Request) {
 
                 // Notify the poster
                 io.to(`user:${toStringId(user._id)}`).emit("post_created", fullPostData);
-                
+
                 console.log("✅ Real-time post broadcasted:", postResponse.id);
             }
         } catch (error: any) {
@@ -259,9 +260,9 @@ export async function GET(req: Request) {
                 try {
                     liked = userId
                         ? await likesCollection.findOne({
-                              userId: userId.toString(),
-                              postId: postId,
-                          })
+                            userId: userId.toString(),
+                            postId: postId,
+                        })
                         : null;
                 } catch (error: any) {
                     console.warn("⚠️  Error checking like:", error?.message);
@@ -300,6 +301,7 @@ export async function GET(req: Request) {
                     likedByUser: !!liked,
                     sharedByUser: false,
                     isPublic: p.isPublic !== false,
+                    codeSnippet: p.codeSnippet || null,
                 };
             })
         );

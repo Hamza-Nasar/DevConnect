@@ -21,6 +21,7 @@ import {
   Sun,
   Moon,
   Flag,
+  Zap,
 } from "lucide-react";
 import Navbar from "@/components/navbar/Navbar";
 import { Card } from "@/components/ui/card";
@@ -44,6 +45,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [isEnhancingBio, setIsEnhancingBio] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
@@ -367,6 +369,35 @@ export default function SettingsPage() {
     }
   };
 
+  const handleEnhanceBio = async () => {
+    if (!profile.bio.trim()) {
+      toast.error("Please enter a bio first");
+      return;
+    }
+
+    setIsEnhancingBio(true);
+    try {
+      const res = await fetch("/api/ai/enhance-bio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bio: profile.bio }),
+      });
+
+      if (!res.ok) throw new Error("Failed to enhance bio");
+
+      const data = await res.json();
+      if (data.enhanced) {
+        setProfile({ ...profile, bio: data.enhanced });
+        toast.success("Bio enhanced with AI! ✨");
+      }
+    } catch (error) {
+      console.error("Error enhancing bio:", error);
+      toast.error("AI enhancement failed. Please try again.");
+    } finally {
+      setIsEnhancingBio(false);
+    }
+  };
+
   if (status === "loading") {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -508,9 +539,25 @@ export default function SettingsPage() {
 
                   {/* Bio */}
                   <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-2">
-                      Bio
-                    </label>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-sm font-medium text-muted-foreground">
+                        Bio
+                      </label>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleEnhanceBio}
+                        disabled={isEnhancingBio || !profile.bio.trim()}
+                        className="h-8 text-[10px] sm:text-xs text-primary hover:text-primary/80 hover:bg-primary/10 gap-1.5"
+                      >
+                        {isEnhancingBio ? (
+                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary" />
+                        ) : (
+                          <Zap className="h-3 w-3" />
+                        )}
+                        <span>AI Enhance</span>
+                      </Button>
+                    </div>
                     <Textarea
                       value={profile.bio}
                       onChange={(e) => setProfile({ ...profile, bio: e.target.value })}

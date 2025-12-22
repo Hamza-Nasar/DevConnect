@@ -44,6 +44,10 @@ export default function CreatePostPage() {
   const [hashtagInput, setHashtagInput] = useState("");
   const [pollOptions, setPollOptions] = useState<string[]>(["", ""]);
   const [pollDuration, setPollDuration] = useState(7);
+  const [isSuggestingTags, setIsSuggestingTags] = useState(false);
+  const [code, setCode] = useState("");
+  const [language, setLanguage] = useState("javascript");
+  const [showCodeInput, setShowCodeInput] = useState(false);
 
   if (status === "loading") {
     return (
@@ -151,6 +155,7 @@ export default function CreatePostPage() {
           postType: postType === "text" ? "regular" : postType,
           pollOptions: postType === "poll" ? pollOptions.filter(o => o.trim()) : undefined,
           pollDuration: postType === "poll" ? pollDuration : undefined,
+          codeSnippet: (showCodeInput && code.trim()) ? { code, language } : undefined,
         }),
       });
 
@@ -176,11 +181,46 @@ export default function CreatePostPage() {
     }
   };
 
+  const handleSuggestTags = async () => {
+    if (!content.trim()) {
+      toast.error("Please add some content first to suggest tags");
+      return;
+    }
+
+    setIsSuggestingTags(true);
+    try {
+      const res = await fetch("/api/ai/suggest-tags", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+
+      if (!res.ok) throw new Error("Failed to suggest tags");
+
+      const data = await res.json();
+      if (data.tags && Array.isArray(data.tags)) {
+        const newTags = data.tags.filter((tag: string) => !hashtags.includes(tag));
+        if (newTags.length === 0) {
+          toast.success("Current tags seem accurate! ✨");
+        } else {
+          setHashtags((prev) => [...prev, ...newTags].slice(0, 5));
+          toast.success(`AI suggested ${newTags.length} new tags! ✨`);
+        }
+      }
+    } catch (error) {
+      console.error("Error suggesting tags:", error);
+      toast.error("AI tagging failed. Please try again.");
+    } finally {
+      setIsSuggestingTags(false);
+    }
+  };
+
   const quickActions = [
     { icon: ImageIcon, label: "Photo", action: () => fileInputRef.current?.click() },
     { icon: Video, label: "Video", action: () => fileInputRef.current?.click() },
     { icon: PollIcon, label: "Poll", action: () => setPostType("poll") },
     { icon: Hash, label: "Hashtag", action: () => setHashtagInput("#") },
+    { icon: Code, label: "Code", action: () => setShowCodeInput(!showCodeInput) },
     { icon: MapPin, label: "Location", action: () => toast("Location feature coming soon") },
     { icon: Smile, label: "Emoji", action: () => toast("Emoji picker coming soon") },
   ];
@@ -270,6 +310,42 @@ export default function CreatePostPage() {
                       className="min-h-[150px] sm:min-h-[200px] resize-none bg-secondary/50 border-input text-sm sm:text-base"
                     />
                   </div>
+
+                  {/* Code Input */}
+                  {showCodeInput && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      className="space-y-3 p-3 sm:p-4 bg-gray-900 rounded-lg sm:rounded-xl border border-gray-700"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <Code className="h-4 w-4 text-primary" />
+                          <span className="text-xs sm:text-sm font-medium text-gray-300">Code Snippet</span>
+                        </div>
+                        <select
+                          value={language}
+                          onChange={(e) => setLanguage(e.target.value)}
+                          className="bg-gray-800 text-gray-300 text-xs rounded border border-gray-700 px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
+                        >
+                          <option value="javascript">JavaScript</option>
+                          <option value="typescript">TypeScript</option>
+                          <option value="python">Python</option>
+                          <option value="html">HTML</option>
+                          <option value="css">CSS</option>
+                          <option value="rust">Rust</option>
+                          <option value="go">Go</option>
+                          <option value="java">Java</option>
+                        </select>
+                      </div>
+                      <Textarea
+                        placeholder="Paste your code here..."
+                        value={code}
+                        onChange={(e) => setCode(e.target.value)}
+                        className="min-h-[150px] font-mono text-xs sm:text-sm bg-gray-950 border-gray-800 text-gray-300 focus:ring-primary"
+                      />
+                    </motion.div>
+                  )}
 
                   {/* Poll Options */}
                   {postType === "poll" && (
@@ -386,28 +462,48 @@ export default function CreatePostPage() {
                   )}
 
                   {/* Hashtag Input */}
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <Input
-                      type="text"
-                      placeholder="Add hashtag (e.g., #webdev)"
-                      value={hashtagInput}
-                      onChange={(e) => setHashtagInput(e.target.value)}
-                      onKeyPress={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          addHashtag();
-                        }
-                      }}
-                      className="bg-secondary/50 border-input text-sm sm:text-base flex-1"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={addHashtag}
-                      className="w-full sm:w-auto text-sm sm:text-base"
-                    >
-                      Add
-                    </Button>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-medium text-muted-foreground">Hashtags</label>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleSuggestTags}
+                        disabled={isSuggestingTags || !content.trim() || hashtags.length >= 5}
+                        className="h-7 text-[10px] sm:text-xs text-primary hover:text-primary/80 hover:bg-primary/10 gap-1"
+                      >
+                        {isSuggestingTags ? (
+                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary" />
+                        ) : (
+                          <Zap className="h-3 w-3" />
+                        )}
+                        Suggest AI Tags
+                      </Button>
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <Input
+                        type="text"
+                        placeholder="Add hashtag (e.g., #webdev)"
+                        value={hashtagInput}
+                        onChange={(e) => setHashtagInput(e.target.value)}
+                        onKeyPress={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            addHashtag();
+                          }
+                        }}
+                        className="bg-secondary/50 border-input text-sm sm:text-base flex-1"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={addHashtag}
+                        className="w-full sm:w-auto text-sm sm:text-base"
+                      >
+                        Add
+                      </Button>
+                    </div>
                   </div>
 
                   {/* Quick Actions */}

@@ -21,6 +21,7 @@ import {
   X,
   Edit,
   Archive,
+  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -70,6 +71,11 @@ interface Post {
   type?: "text" | "poll" | "story" | "reel";
   pollOptions?: Array<{ option: string; votes: number }>;
   pollDuration?: number;
+  codeSnippet?: {
+    code: string;
+    language: string;
+  };
+  summary?: string;
 }
 
 interface PostItemProps {
@@ -101,6 +107,10 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
   const [editContent, setEditContent] = useState(post.content);
   const [editTitle, setEditTitle] = useState(post.title || "");
   const [isSaving, setIsSaving] = useState(false);
+  const [isExplaining, setIsExplaining] = useState(false);
+  const [explanation, setExplanation] = useState<string | null>(null);
+  const [isSummarizing, setIsSummarizing] = useState(false);
+  const [postSummary, setPostSummary] = useState<string | null>(post.summary || null);
 
   const isOwnPost = session?.user?.id === post.userId;
 
@@ -471,6 +481,63 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
     }
   };
 
+  const handleExplainCode = async () => {
+    if (!post.codeSnippet || isExplaining) return;
+
+    if (explanation) {
+      setExplanation(null);
+      return;
+    }
+
+    setIsExplaining(true);
+    try {
+      const res = await fetch("/api/ai/explain-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: post.codeSnippet.code,
+          language: post.codeSnippet.language
+        }),
+      });
+
+      if (!res.ok) throw new Error("Failed to explain code");
+      const data = await res.json();
+      setExplanation(data.explanation);
+    } catch (error) {
+      console.error("Error explaining code:", error);
+      toast.error("Failed to get explanation");
+    } finally {
+      setIsExplaining(false);
+    }
+  };
+
+  const handleSummarize = async () => {
+    if (isSummarizing) return;
+
+    if (postSummary) {
+      setPostSummary(null);
+      return;
+    }
+
+    setIsSummarizing(true);
+    try {
+      const res = await fetch("/api/ai/summarize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: post.content }),
+      });
+
+      if (!res.ok) throw new Error("Failed to summarize");
+      const data = await res.json();
+      setPostSummary(data.summary);
+    } catch (error) {
+      console.error("Error summarizing:", error);
+      toast.error("Failed to get summary");
+    } finally {
+      setIsSummarizing(false);
+    }
+  };
+
   const handleDeleteComment = async (commentId: string) => {
     try {
       const res = await fetch(`/api/comments/${commentId}`, {
@@ -720,7 +787,65 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
             )}
 
             {/* Post Content */}
+            {postSummary && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                className="mb-4 p-4 bg-primary/5 border border-primary/20 rounded-xl"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <Zap className="h-4 w-4 text-primary" />
+                  <span className="text-xs font-bold text-primary uppercase tracking-wider">AI Summary</span>
+                </div>
+                <p className="text-sm text-foreground italic">{postSummary}</p>
+              </motion.div>
+            )}
             <p className="text-muted-foreground mb-4 whitespace-pre-wrap">{post.content}</p>
+
+            {/* Code Snippet */}
+            {post.codeSnippet && (
+              <div className="mb-4 rounded-xl border border-border bg-gray-900 overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-2 bg-gray-800 border-b border-gray-700">
+                  <div className="flex items-center gap-2">
+                    <Edit className="h-4 w-4 text-gray-400" />
+                    <span className="text-xs font-medium text-gray-300 uppercase">{post.codeSnippet.language}</span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleExplainCode}
+                    disabled={isExplaining}
+                    className="h-7 text-[10px] sm:text-xs text-primary hover:text-primary/80 hover:bg-primary/10 gap-1"
+                  >
+                    {isExplaining ? (
+                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary" />
+                    ) : (
+                      <Zap className="h-3 w-3" />
+                    )}
+                    {explanation ? "Hide Explanation" : "AI Explain"}
+                  </Button>
+                </div>
+                <div className="p-4 overflow-x-auto">
+                  <pre className="text-sm text-gray-300 font-mono">
+                    <code>{post.codeSnippet.code}</code>
+                  </pre>
+                </div>
+
+                {explanation && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="p-4 bg-primary/10 border-t border-primary/20"
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <Zap className="h-3 w-3 text-primary" />
+                      <span className="text-[10px] font-bold text-primary uppercase tracking-wider">Explanation</span>
+                    </div>
+                    <p className="text-xs text-foreground leading-relaxed italic">{explanation}</p>
+                  </motion.div>
+                )}
+              </div>
+            )}
           </>
         )}
 
@@ -946,6 +1071,22 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
               <Bookmark className={`h-5 w-5 ${bookmarked ? "fill-current" : ""}`} />
               <span className="ml-1">{formatNumber(bookmarksCount)}</span>
             </Button>
+
+            {/* Summarize */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleSummarize}
+              disabled={isSummarizing || post.content.length < 100}
+              className={`${postSummary ? "text-primary hover:text-primary/80" : "text-muted-foreground hover:text-primary"} gap-1`}
+              title="AI Summarize"
+            >
+              {isSummarizing ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary" />
+              ) : (
+                <Zap className={`h-5 w-5 ${postSummary ? "fill-current" : ""}`} />
+              )}
+            </Button>
           </div>
 
           {/* Views */}
@@ -1009,10 +1150,10 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
                 {comments.map((comment, index) => {
                   // Generate unique key - always include index to ensure uniqueness
                   const commentId = comment.id || comment._id;
-                  const uniqueKey = commentId 
-                    ? `${commentId}-${index}-${post.id}` 
+                  const uniqueKey = commentId
+                    ? `${commentId}-${index}-${post.id}`
                     : `comment-${post.id}-${index}-${comment.createdAt || Date.now()}`;
-                  
+
                   return (
                     <motion.div
                       key={uniqueKey}
@@ -1020,34 +1161,34 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
                       animate={{ opacity: 1, y: 0 }}
                       className="flex gap-2"
                     >
-                    <RealTimeAvatar
-                      userId={comment.userId}
-                      src={comment.user?.image || comment.user?.avatar}
-                      alt={comment.user?.name || "User"}
-                      size="sm"
-                    />
-                    <div className="flex-1">
-                      <div className="bg-secondary/50 rounded-lg px-3 py-2">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-semibold text-foreground text-sm">
-                            {comment.user?.name || "Anonymous"}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {formatTimeAgo(comment.createdAt)}
-                          </span>
+                      <RealTimeAvatar
+                        userId={comment.userId}
+                        src={comment.user?.image || comment.user?.avatar}
+                        alt={comment.user?.name || "User"}
+                        size="sm"
+                      />
+                      <div className="flex-1">
+                        <div className="bg-secondary/50 rounded-lg px-3 py-2">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-semibold text-foreground text-sm">
+                              {comment.user?.name || "Anonymous"}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {formatTimeAgo(comment.createdAt)}
+                            </span>
+                          </div>
+                          <p className="text-sm text-foreground whitespace-pre-wrap">{comment.content}</p>
                         </div>
-                        <p className="text-sm text-foreground whitespace-pre-wrap">{comment.content}</p>
+                        {comment.userId === session?.user?.id && (
+                          <button
+                            onClick={() => handleDeleteComment(comment.id)}
+                            className="text-xs text-destructive hover:text-destructive/80 mt-1 ml-1"
+                          >
+                            Delete
+                          </button>
+                        )}
                       </div>
-                      {comment.userId === session?.user?.id && (
-                        <button
-                          onClick={() => handleDeleteComment(comment.id)}
-                          className="text-xs text-destructive hover:text-destructive/80 mt-1 ml-1"
-                        >
-                          Delete
-                        </button>
-                      )}
-                    </div>     
-                  </motion.div>
+                    </motion.div>
                   );
                 })}
               </div>
