@@ -94,38 +94,42 @@ export const authOptions: AuthOptions = {
     callbacks: {
         async session({ session, token }) {
             if (session?.user && token) {
-                // Use the database ID we stored in the token
-                session.user.id = (token.dbId as string) || token.sub || (token.id as string) || '';
-                session.user.email = (token.email as string) || null;
-                session.user.name = (token.name as string) || null;
-                session.user.username = (token.username as string) || null;
-                session.user.image = (token.picture as string) || (token.image as string) || null;
+                // Map from minified keys back to original names
+                session.user.id = (token.d as string) || (token.sub as string) || (token.id as string) || '';
+                session.user.email = (token.e as string) || (token.email as string) || null;
+                session.user.name = (token.n as string) || (token.name as string) || null;
+                session.user.username = (token.u as string) || (token.username as string) || null;
+                session.user.image = (token.p as string) || (token.picture as string) || null;
+
+                // Add accessToken if needed, but keep it small if possible
+                if (token.a) (session as any).accessToken = token.a;
             }
             return session;
         },
         async jwt({ token, user, account, trigger, session }) {
             // For JWT strategy, store user info in token
+            // Mapping short names for compression
             if (user) {
-                token.id = user.id; // Original ID from provider
-                token.email = user.email;
-                token.name = user.name;
-                token.username = user.username;
-                token.picture = user.image || user.avatar;
+                token.d = user.id; // Using 'd' for ID
+                token.e = user.email;
+                token.n = user.name;
+                token.u = user.username;
+                token.p = user.image || user.avatar;
 
-                // If user doesn't have MongoDB _id as ID (like Google users), 
-                // we'll try to get it in the next step or it will be resolved in session
+                // Clear long keys
+                delete (token as any).name;
+                delete (token as any).email;
+                delete (token as any).picture;
             }
 
-            // Ensure we have the MongoDB _id in the token
-            if (!token.dbId && token.email) {
+            // Ensure we have the MongoDB _id in the token (compressed as 'd')
+            if (!token.d && token.e) {
                 try {
                     const { getCollection } = await import("./mongodb");
                     const usersCollection = await getCollection("users");
-                    const dbUser = await usersCollection.findOne({ email: token.email });
+                    const dbUser = await usersCollection.findOne({ email: token.e });
                     if (dbUser) {
-                        (token as any).dbId = dbUser._id.toString();
-                        // Also override token.id if it's not the DB ID
-                        token.id = (token as any).dbId;
+                        token.d = dbUser._id.toString();
                     }
                 } catch (e) {
                     console.error("Error fetching dbId for token:", e);
@@ -134,14 +138,21 @@ export const authOptions: AuthOptions = {
 
             // Handle session update
             if (trigger === "update" && session?.user) {
-                if (session.user.username) token.username = session.user.username;
-                if (session.user.name) token.name = session.user.name;
-                if (session.user.image) token.picture = session.user.image;
+                if (session.user.username) token.u = session.user.username;
+                if (session.user.name) token.n = session.user.name;
+                if (session.user.image) token.p = session.user.image;
             }
 
             if (account) {
-                token.accessToken = account.access_token;
+                // Keep accessToken but use short key 'a'
+                token.a = account.access_token;
             }
+
+            // Final cleanup of any potential long keys that NextAuth might have injected
+            delete (token as any).name;
+            delete (token as any).email;
+            delete (token as any).picture;
+
             return token;
         },
         async redirect({ url, baseUrl }) {
@@ -174,12 +185,12 @@ export const authOptions: AuthOptions = {
             if (account?.provider === "google" && user?.email) {
                 try {
                     const { getCollection } = await import("./mongodb");
-                    
+
                     // Try to use new collection helpers, fallback to direct collection access
                     let getUsersCollection: any;
                     let createAccount: any;
                     let findAccountByProvider: any;
-                    
+
                     try {
                         const dbCollections = await import("./db-collections");
                         getUsersCollection = dbCollections.getUsersCollection;
@@ -203,7 +214,7 @@ export const authOptions: AuthOptions = {
                             return accountsCollection.findOne({ provider, providerAccountId });
                         };
                     }
-                    
+
                     const usersCollection = await getUsersCollection();
 
                     // Check if user exists
@@ -213,7 +224,7 @@ export const authOptions: AuthOptions = {
 
                     if (existingUser && !existingUser.username) {
                         userId = existingUser._id.toString();
-                        
+
                         // Generate username from name or email
                         const baseUsername = user.name
                             ? user.name.toLowerCase().replace(/\s+/g, '')
@@ -262,7 +273,7 @@ export const authOptions: AuthOptions = {
                             createdAt: new Date(),
                             updatedAt: new Date(),
                         });
-                        
+
                         userId = result.insertedId.toString();
                     } else {
                         userId = existingUser._id.toString();
