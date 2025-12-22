@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { findPostById, toStringId, toObjectId } from "@/lib/db";
 import { getCollection } from "@/lib/mongodb";
 import { COLLECTIONS } from "@/lib/db";
+import { getSocketInstance } from "@/lib/socket-server";
 
 // Create a poll
 export async function POST(req: Request) {
@@ -52,67 +53,115 @@ export async function POST(req: Request) {
     }
 }
 
-// Vote on a poll
-export async function PUT(req: Request) {
+// Vote on a poll (Standardized to handle both separate and embedded polls)
+export async function PATCH(req: Request) {
     try {
         const session = await getServerSession(authOptions);
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const { pollId, optionId } = await req.json();
+        const { pollId, optionId, postId } = await req.json();
 
-        if (!pollId || optionId === undefined) {
-            return NextResponse.json({ error: "Poll ID and option ID required" }, { status: 400 });
+        if (!pollId && !postId) {
+            return NextResponse.json({ error: "Poll ID or Post ID required" }, { status: 400 });
         }
 
         const pollsCollection = await getCollection(COLLECTIONS.POLLS);
         const pollVotesCollection = await getCollection(COLLECTIONS.POLL_VOTES);
+        const postsCollection = await getCollection(COLLECTIONS.POSTS);
 
-        const pollIdObj = toObjectId(pollId);
-        if (!pollIdObj) {
-            return NextResponse.json({ error: "Invalid poll ID" }, { status: 400 });
+        let finalPollId = pollId;
+        let poll: any = null;
+
+        if (pollId) {
+            const pollIdObj = toObjectId(pollId);
+            if (pollIdObj) {
+                poll = await pollsCollection.findOne({ _id: pollIdObj });
+            }
+        } else if (postId) {
+            const post = await findPostById(postId);
+            if (post?.type === "poll" || post?.pollOptions) {
+                poll = post;
+                finalPollId = postId;
+            }
         }
-        const poll = await pollsCollection.findOne({ _id: pollIdObj });
+
         if (!poll) {
             return NextResponse.json({ error: "Poll not found" }, { status: 404 });
         }
 
         // Check if already voted
         const existingVote = await pollVotesCollection.findOne({
-            pollId,
+            pollId: finalPollId,
             userId: session.user.id,
         });
 
         if (existingVote) {
-            // Update existing vote
             await pollVotesCollection.updateOne(
                 { _id: existingVote._id },
-                { $set: { optionId } }
+                { $set: { optionId, updatedAt: new Date() } }
             );
         } else {
-            // Create new vote
             await pollVotesCollection.insertOne({
-                pollId,
+                pollId: finalPollId,
                 userId: session.user.id,
                 optionId,
+                createdAt: new Date(),
             });
         }
 
-        // Get vote counts
-        const votes = await pollVotesCollection.find({ pollId }).toArray();
-        const voteCounts = poll.options.map((_: any, idx: number) => {
-            return votes.filter((v: any) => v.optionId === idx).length;
+        // Get total vote counts
+        const allVotes = await pollVotesCollection.find({ pollId: finalPollId }).toArray();
+        const voteCounts = (poll.options || poll.pollOptions).map((_: any, idx: number) => {
+            return allVotes.filter((v: any) => v.optionId === idx).length;
         });
 
-        return NextResponse.json({
-            pollId,
+        const totalVotes = allVotes.length;
+
+        // Sync with posts collection if it's an embedded poll
+        if (postId || (poll.postId && !pollId)) {
+            const targetPostId = postId || poll.postId;
+            const targetPostIdObj = toObjectId(targetPostId);
+            if (targetPostIdObj) {
+                // Better: update specific indices
+                for (let i = 0; i < voteCounts.length; i++) {
+                    await postsCollection.updateOne(
+                        { _id: targetPostIdObj },
+                        { $set: { [`pollOptions.${i}.votes`]: voteCounts[i] } }
+                    );
+                }
+            }
+        }
+
+        const responseData = {
+            pollId: finalPollId,
             optionId,
             voteCounts,
-            totalVotes: votes.length,
-        });
+            totalVotes,
+        };
+
+        // Broadcast real-time update
+        try {
+            const io = getSocketInstance();
+            if (io) {
+                const broadcastRoom = postId ? `post:${postId}` : `poll:${finalPollId}`;
+                io.to(broadcastRoom).emit("poll_update", responseData);
+                // Also broadcast globally if needed or to general feed
+                io.emit("poll_refreshed", { postId, ...responseData });
+            }
+        } catch (err) {
+            console.warn("Socket broadcast failed for poll update");
+        }
+
+        return NextResponse.json(responseData);
     } catch (error: any) {
         console.error("Error voting on poll:", error);
         return NextResponse.json({ error: "Server error" }, { status: 500 });
     }
+}
+
+// Keep PUT for compatibility
+export async function PUT(req: Request) {
+    return PATCH(req);
 }

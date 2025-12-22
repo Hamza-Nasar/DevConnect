@@ -53,10 +53,67 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
     if (showComments) fetchComments();
   }, [showComments]);
 
+  // Real-time socket listeners for post updates
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+
+    const handleCommentAdded = (data: { postId: string; comment: any; commentsCount: number }) => {
+      if (data.postId === post.id) {
+        setComments((prev: any[]) => [...prev, data.comment]);
+        setCommentsCount(data.commentsCount);
+      }
+    };
+
+    const handleCommentDeleted = (data: { postId: string; commentId: string; commentsCount: number }) => {
+      if (data.postId === post.id) {
+        setComments((prev: any[]) => prev.filter(c => (c.id || c._id) !== data.commentId));
+        setCommentsCount(data.commentsCount);
+      }
+    };
+
+    const handleLikeUpdated = (data: { postId: string; likesCount: number; liked: boolean; userId: string }) => {
+      if (data.postId === post.id) {
+        setLikesCount(data.likesCount);
+        // Only update local liked state if it's not our own action
+        if (session?.user?.id !== data.userId) {
+          // Don't change our liked state based on others' actions
+        }
+      }
+    };
+
+    const handlePollUpdate = (data: { pollId: string; voteCounts: number[]; totalVotes: number }) => {
+      if (data.pollId === post.id) {
+        setPollVotes((prev: any[]) =>
+          prev.map((opt: any, idx: number) => ({
+            ...opt,
+            votes: data.voteCounts[idx] || opt.votes
+          }))
+        );
+      }
+    };
+
+    // Join post room
+    socket.emit("join_post", post.id);
+
+    socket.on("comment_added", handleCommentAdded);
+    socket.on("comment_deleted", handleCommentDeleted);
+    socket.on("like_updated", handleLikeUpdated);
+    socket.on("poll_update", handlePollUpdate);
+
+    return () => {
+      socket.off("comment_added", handleCommentAdded);
+      socket.off("comment_deleted", handleCommentDeleted);
+      socket.off("like_updated", handleLikeUpdated);
+      socket.off("poll_update", handlePollUpdate);
+      socket.emit("leave_post", post.id);
+    };
+  }, [post.id, session?.user?.id]);
+
   const fetchComments = async () => {
     setIsLoadingComments(true);
     try {
-      const res = await fetch(`/api/posts/${post.id}/comments`);
+      const res = await fetch(`/api/comments?postId=${post.id}`);
       if (res.ok) {
         const data = await res.json();
         setComments(data);
@@ -73,7 +130,7 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
     setIsLiking(true);
     const newLiked = !liked;
     setLiked(newLiked);
-    setLikesCount(prev => newLiked ? prev + 1 : prev - 1);
+    setLikesCount((prev: number) => newLiked ? prev + 1 : prev - 1);
 
     try {
       const res = await fetch(`/api/posts/${post.id}/like`, { method: "POST" });
@@ -81,7 +138,7 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
       getSocket()?.emit("post_action", { type: "like", postId: post.id, userId: session.user.id });
     } catch (error) {
       setLiked(!newLiked);
-      setLikesCount(prev => !newLiked ? prev + 1 : prev - 1);
+      setLikesCount((prev: number) => !newLiked ? prev + 1 : prev - 1);
       toast.error("Failed to update like");
     } finally {
       setIsLiking(false);
@@ -92,14 +149,14 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
     if (!session) return;
     const newBookmarked = !bookmarked;
     setBookmarked(newBookmarked);
-    setBookmarksCount(prev => newBookmarked ? prev + 1 : prev - 1);
+    setBookmarksCount((prev: number) => newBookmarked ? prev + 1 : prev - 1);
 
     try {
       const res = await fetch(`/api/posts/${post.id}/bookmark`, { method: "POST" });
       if (!res.ok) throw new Error();
     } catch (error) {
       setBookmarked(!newBookmarked);
-      setBookmarksCount(prev => !newBookmarked ? prev + 1 : prev - 1);
+      setBookmarksCount((prev: number) => !newBookmarked ? prev + 1 : prev - 1);
       toast.error("Failed to update bookmark");
     }
   };
@@ -124,26 +181,76 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
     }
   };
 
-  const handlePostComment = async () => {
-    if (!commentInput.trim() || isPostingComment) return;
+  const handlePostComment = async (content: string, parentId?: string) => {
+    if (!content.trim() || isPostingComment) return;
     setIsPostingComment(true);
     try {
-      const res = await fetch(`/api/posts/${post.id}/comments`, {
+      const res = await fetch(`/api/comments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: commentInput }),
+        body: JSON.stringify({
+          postId: post.id,
+          content: content,
+          parentId: parentId || null
+        }),
       });
       if (res.ok) {
         const newComment = await res.json();
-        setComments(prev => [newComment, ...prev]);
+        setComments((prev: any[]) => [...prev, newComment]); // Add to end since we sort ascending
         setCommentInput("");
-        setCommentsCount(prev => prev + 1);
+        setCommentsCount((prev: number) => prev + 1);
         toast.success("Comment posted!");
       }
     } catch (error) {
       toast.error("Failed to post comment");
     } finally {
       setIsPostingComment(false);
+    }
+  };
+
+  const handleExplainCode = async () => {
+    if (!post.codeSnippet || isExplaining) return;
+    setIsExplaining(true);
+    try {
+      const res = await fetch(`/api/ai/explain-code`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: post.codeSnippet.code,
+          language: post.codeSnippet.language
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setExplanation(data.explanation);
+        toast.success("Explanation generated!");
+      }
+    } catch (error) {
+      toast.error("Failed to explain code");
+    } finally {
+      setIsExplaining(false);
+    }
+  };
+
+  const handleFormatCode = async () => {
+    if (!post.codeSnippet) return;
+    try {
+      const res = await fetch(`/api/ai/format-code`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: post.codeSnippet.code,
+          language: post.codeSnippet.language
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        post.codeSnippet.code = data.formattedCode; // Optimistic update on the post object
+        setEditContent(post.content); // Trigger re-render if needed or just force Update
+        toast.success("Code formatted!");
+      }
+    } catch (error) {
+      toast.error("Failed to format code");
     }
   };
 
@@ -205,6 +312,10 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
             pollVotes={pollVotes}
             totalPollVotes={totalVotes}
             handlePollVote={handlePollVote}
+            explanation={explanation}
+            isExplaining={isExplaining}
+            onExplainCode={handleExplainCode}
+            onFormatCode={handleFormatCode}
           />
         )}
 
@@ -221,6 +332,7 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
           onShare={() => toast.success("Link copied to clipboard!")}
           onBookmark={handleBookmark}
           onSummarize={handleSummarize}
+          onExplain={handleExplainCode} // Added
           hasCode={!!post.codeSnippet}
           isSummarizing={isSummarizing}
           isExplaining={isExplaining}
@@ -230,11 +342,9 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
           {showComments && (
             <CommentSection
               comments={comments}
-              commentInput={commentInput}
-              setCommentInput={setCommentInput}
               isPostingComment={isPostingComment}
               onPostComment={handlePostComment}
-              onDeleteComment={(id) => setComments(prev => prev.filter(c => c.id !== id))}
+              onDeleteComment={(id) => setComments((prev: any[]) => prev.filter(c => (c.id || c._id) !== id))}
               currentUserId={session?.user?.id}
             />
           )}

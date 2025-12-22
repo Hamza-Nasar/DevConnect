@@ -100,6 +100,7 @@ export const authOptions: AuthOptions = {
                 session.user.name = (token.n as string) || (token.name as string) || null;
                 session.user.username = (token.u as string) || (token.username as string) || null;
                 session.user.image = (token.p as string) || (token.picture as string) || null;
+                session.user.role = (token.r as string) || "USER";
 
                 // Add accessToken if needed, but keep it small if possible
                 if (token.a) (session as any).accessToken = token.a;
@@ -115,6 +116,7 @@ export const authOptions: AuthOptions = {
                 token.n = user.name;
                 token.u = user.username;
                 token.p = user.image || user.avatar;
+                token.r = (user as any).role || "USER";
 
                 // Clear long keys
                 delete (token as any).name;
@@ -130,6 +132,7 @@ export const authOptions: AuthOptions = {
                     const dbUser = await usersCollection.findOne({ email: token.e });
                     if (dbUser) {
                         token.d = dbUser._id.toString();
+                        token.r = dbUser.role || "USER";
                     }
                 } catch (e) {
                     console.error("Error fetching dbId for token:", e);

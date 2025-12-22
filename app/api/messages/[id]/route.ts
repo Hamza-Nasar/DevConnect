@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getCollection } from "@/lib/mongodb";
-import { toObjectId, toStringId } from "@/lib/db";
+import { toObjectId, toStringId, recordAuditLog } from "@/lib/db";
 import { getSocketInstance } from "@/lib/socket-server";
+import { isAdmin } from "@/lib/rbac";
 
 export async function GET(
   req: NextRequest,
@@ -179,18 +180,91 @@ export async function DELETE(
       if (oauthId && !userIds.includes(oauthId)) userIds.push(oauthId);
     }
 
-    // Check if user is sender
-    if (!userIds.includes(message.senderId)) {
+    // Check if user is sender or Admin
+    if (!userIds.includes(message.senderId) && !isAdmin(session)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     await messagesCollection.deleteOne({ _id: messageIdObj });
+
+    // Record Audit Log
+    await recordAuditLog(session.user.id, "DELETE_MESSAGE", {
+      messageId: id,
+      messageSenderId: message.senderId,
+      messageReceiverId: message.receiverId,
+      reason: !userIds.includes(message.senderId) ? "ADMIN_ACTION" : "USER_ACTION",
+      userAgent: req.headers.get("user-agent"),
+      ip: req.headers.get("x-forwarded-for") || "unknown"
+    });
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error("Error deleting message:", error);
     return NextResponse.json(
       { error: "Failed to delete message" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await params;
+    const { content } = await req.json();
+    if (!content) {
+      return NextResponse.json({ error: "Content required" }, { status: 400 });
+    }
+
+    const messagesCollection = await getCollection("messages");
+    const messageIdObj = toObjectId(id);
+    if (!messageIdObj) {
+      return NextResponse.json({ error: "Invalid message ID" }, { status: 400 });
+    }
+
+    const message = await messagesCollection.findOne({ _id: messageIdObj });
+    if (!message) {
+      return NextResponse.json({ error: "Message not found" }, { status: 404 });
+    }
+
+    // Verify ownership
+    if (message.senderId !== session.user.id) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const edits = message.edits || [];
+    edits.push({
+      content: message.content, // Old content
+      createdAt: new Date().toISOString(),
+    });
+
+    await messagesCollection.updateOne(
+      { _id: messageIdObj },
+      {
+        $set: {
+          content,
+          edits,
+          updatedAt: new Date().toISOString()
+        }
+      }
+    );
+
+    return NextResponse.json({
+      id: id,
+      content,
+      edits
+    });
+  } catch (error: any) {
+    console.error("Error editing message:", error);
+    return NextResponse.json(
+      { error: "Failed to edit message" },
       { status: 500 }
     );
   }

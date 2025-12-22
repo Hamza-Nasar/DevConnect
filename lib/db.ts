@@ -202,6 +202,7 @@ export async function createComment(commentData: any) {
   const collection = await getCollection(COLLECTIONS.COMMENTS);
   const result = await collection.insertOne({
     ...commentData,
+    parentId: commentData.parentId || null,
     createdAt: new Date(),
   });
   return collection.findOne({ _id: result.insertedId });
@@ -209,9 +210,10 @@ export async function createComment(commentData: any) {
 
 export async function findCommentsByPostId(postId: string) {
   const collection = await getCollection(COLLECTIONS.COMMENTS);
-  const _id = toObjectId(postId);
-  if (!_id) return [];
-  return collection.find({ postId: _id.toString() }).sort({ createdAt: -1 }).toArray();
+  return collection
+    .find({ postId: postId.toString() })
+    .sort({ createdAt: 1 }) // Change to ascending for threaded view usually, or keep descending and handling in frontend. Let's keep 1 (oldest first) to make conversations readable top-down.
+    .toArray();
 }
 
 // ==================== LIKE HELPERS ====================
@@ -297,14 +299,83 @@ export async function countShares(postId: string) {
 
 // ==================== NOTIFICATION HELPERS ====================
 // Notifications collection - تمام notifications الگ collection میں
+// Smart Batching: Similarly typed notifications for same link are merged
 export async function createNotification(notificationData: any) {
   const collection = await getCollection(COLLECTIONS.NOTIFICATIONS);
+
+  // Try to find a similar unread notification created in the last 24 hours to batch
+  const twentyFourHoursAgo = new Date();
+  twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
+
+  const existingNotification = await collection.findOne({
+    userId: notificationData.userId,
+    type: notificationData.type,
+    link: notificationData.link,
+    read: false,
+    createdAt: { $gte: twentyFourHoursAgo }
+  });
+
+  if (existingNotification) {
+    // If it's a notification that can be batched (e.g., likes, comments)
+    // We update the message to reflect multiple actors
+    // This is a simple version: we track 'contributors' in the notification
+    let contributors = existingNotification.contributors || [];
+    if (notificationData.actorId && !contributors.includes(notificationData.actorId)) {
+      contributors.push(notificationData.actorId);
+    }
+
+    let newMessage = notificationData.message;
+    if (contributors.length > 1) {
+      const count = contributors.length;
+      if (notificationData.type === "like") {
+        newMessage = `${count} people liked your post`;
+      } else if (notificationData.type === "comment") {
+        newMessage = `${count} people commented on your post`;
+      } else if (notificationData.type === "follow") {
+        newMessage = `${count} people started following you`;
+      }
+    }
+
+    await collection.updateOne(
+      { _id: existingNotification._id },
+      {
+        $set: {
+          message: newMessage,
+          contributors: contributors,
+          updatedAt: new Date()
+        }
+      }
+    );
+    return collection.findOne({ _id: existingNotification._id });
+  }
+
+  // Create new notification if no match
   const result = await collection.insertOne({
     ...notificationData,
+    contributors: notificationData.actorId ? [notificationData.actorId] : [],
     read: false,
     createdAt: new Date(),
+    updatedAt: new Date(),
   });
   return collection.findOne({ _id: result.insertedId });
+}
+
+// ==================== AUDIT LOG HELPERS ====================
+export async function recordAuditLog(userId: string, action: string, details: any = {}) {
+  try {
+    const collection = await getCollection((COLLECTIONS as any).AUDIT_LOGS || "audit_logs");
+    await collection.insertOne({
+      userId,
+      action,
+      details,
+      ip: details.ip || "unknown",
+      userAgent: details.userAgent || "unknown",
+      createdAt: new Date(),
+    });
+  } catch (error) {
+    console.error("Error recording audit log:", error);
+    // Don't throw - audit logging shouldn't break the main flow
+  }
 }
 
 export async function findNotificationsByUserId(userId: string, limit: number = 20, skip: number = 0) {
@@ -382,4 +453,19 @@ export async function getProfileViewers(userId: string, limit: number = 20, skip
   );
 
   return viewers.filter(v => v.viewer); // Only return existing users
+}
+
+// ==================== FOLLOW HELPERS ====================
+export async function findFollowsByFollowerId(followerId: string) {
+  const collection = await getCollection(COLLECTIONS.FOLLOWS);
+  return collection.find({ followerId: followerId.toString() }).toArray();
+}
+
+export async function isFollowing(followerId: string, followingId: string) {
+  const collection = await getCollection(COLLECTIONS.FOLLOWS);
+  const follow = await collection.findOne({
+    followerId: followerId.toString(),
+    followingId: followingId.toString(),
+  });
+  return !!follow;
 }

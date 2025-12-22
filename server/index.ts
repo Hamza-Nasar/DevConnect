@@ -8,6 +8,7 @@ interface CustomSocket extends Socket {
 import { getCollection } from "../lib/mongodb";
 import { toObjectId, toStringId, COLLECTIONS } from "../lib/db";
 import { setSocketInstance } from "../lib/socket-server";
+import { createNotification } from "../lib/db";
 
 export function initializeSocket(server: HTTPServer) {
   const io = new SocketIOServer(server, {
@@ -337,6 +338,7 @@ export function initializeSocket(server: HTTPServer) {
             // Create notification
             const notification = {
               userId: post.userId,
+              actorId: data.userId,
               type: "comment",
               title: "New Comment",
               message: `${user?.name || "Someone"} commented on your post`,
@@ -344,14 +346,16 @@ export function initializeSocket(server: HTTPServer) {
               read: false,
               createdAt: new Date(),
             };
-            const notifResult = await notificationsCollection.insertOne(notification);
+            const notifResult = await createNotification(notification);
 
             // Emit generic notification event
-            io.to(`user:${post.userId}`).emit("notification", {
-              ...notification,
-              _id: notifResult.insertedId.toString(),
-              id: notifResult.insertedId.toString()
-            });
+            if (notifResult) {
+              io.to(`user:${post.userId}`).emit("notification", {
+                ...notification,
+                _id: notifResult._id.toString(),
+                id: notifResult._id.toString()
+              });
+            }
           }
 
           // Get updated comments count
@@ -419,6 +423,7 @@ export function initializeSocket(server: HTTPServer) {
           // Create notification for post owner
           const notification = {
             userId: post.userId,
+            actorId: data.userId,
             type: "like",
             title: "New Like",
             message: "Someone liked your post",
@@ -426,14 +431,16 @@ export function initializeSocket(server: HTTPServer) {
             read: false,
             createdAt: new Date(),
           };
-          const notifResult = await notificationsCollection.insertOne(notification);
+          const notifResult = await createNotification(notification);
 
           // Emit generic notification event
-          io.to(`user:${post.userId}`).emit("notification", {
-            ...notification,
-            _id: notifResult.insertedId.toString(),
-            id: notifResult.insertedId.toString()
-          });
+          if (notifResult) {
+            io.to(`user:${post.userId}`).emit("notification", {
+              ...notification,
+              _id: notifResult._id.toString(),
+              id: notifResult._id.toString()
+            });
+          }
 
           io.to(`user:${post.userId}`).emit("post_liked", { postId: data.postId, liked: data.liked });
         }
@@ -467,6 +474,7 @@ export function initializeSocket(server: HTTPServer) {
         if (post && post.userId !== data.userId) {
           const notification = {
             userId: post.userId,
+            actorId: data.userId,
             type: "share",
             title: "Post Shared",
             message: "Someone shared your post",
@@ -474,14 +482,16 @@ export function initializeSocket(server: HTTPServer) {
             read: false,
             createdAt: new Date(),
           };
-          const notifResult = await notificationsCollection.insertOne(notification);
+          const notifResult = await createNotification(notification);
 
           // Emit generic notification event
-          io.to(`user:${post.userId}`).emit("notification", {
-            ...notification,
-            _id: notifResult.insertedId.toString(),
-            id: notifResult.insertedId.toString()
-          });
+          if (notifResult) {
+            io.to(`user:${post.userId}`).emit("notification", {
+              ...notification,
+              _id: notifResult._id.toString(),
+              id: notifResult._id.toString()
+            });
+          }
 
           io.to(`user:${post.userId}`).emit("post_shared", { postId: data.postId });
         }
@@ -554,6 +564,7 @@ export function initializeSocket(server: HTTPServer) {
 
         const notification = {
           userId: data.followingId,
+          actorId: data.followerId,
           type: "follow",
           title: "New Follower",
           message: "Someone started following you",
@@ -561,14 +572,16 @@ export function initializeSocket(server: HTTPServer) {
           read: false,
           createdAt: new Date(),
         };
-        const notifResult = await notificationsCollection.insertOne(notification);
+        const notifResult = await createNotification(notification);
 
         // Emit generic notification event
-        io.to(`user:${data.followingId}`).emit("notification", {
-          ...notification,
-          _id: notifResult.insertedId.toString(),
-          id: notifResult.insertedId.toString()
-        });
+        if (notifResult) {
+          io.to(`user:${data.followingId}`).emit("notification", {
+            ...notification,
+            _id: notifResult._id.toString(),
+            id: notifResult._id.toString()
+          });
+        }
 
         io.to(`user:${data.followingId}`).emit("new_follower", { followerId: data.followerId });
       } catch (error) {
@@ -582,7 +595,7 @@ export function initializeSocket(server: HTTPServer) {
     });
 
     // Handle new message (Direct Message)
-    socket.on("send_message", (data: { message: { senderId: string }; receiverId: string }) => {
+    socket.on("send_message", (data: { message: { id?: string; senderId: string }; receiverId: string }) => {
       console.log(`💬 [Server] Message: ${data.message.senderId} → ${data.receiverId}`);
 
       // Emit to receiver
@@ -590,6 +603,16 @@ export function initializeSocket(server: HTTPServer) {
 
       // Emit to sender (for other tabs)
       io.to(`user:${data.message.senderId}`).emit("new_message", data.message);
+
+      // Send delivery confirmation to sender if message has an ID
+      if (data.message.id) {
+        io.to(`user:${data.message.senderId}`).emit("message_delivered", {
+          messageId: data.message.id,
+          userId: data.receiverId,
+          deliveredAt: new Date()
+        });
+      }
+
       console.log(`✅ [Server] Message delivered to receiver: user:${data.receiverId} and sender: user:${data.message.senderId}`);
     });
 
@@ -603,15 +626,64 @@ export function initializeSocket(server: HTTPServer) {
       });
     });
 
-    // Handle typing (Direct Message)
+    // Handle message reaction
+    socket.on("message_reaction", (data: { messageId: string; userId: string; receiverId: string; reactions: any[] }) => {
+      console.log(`❤️ [Server] Reaction: ${data.messageId} from ${data.userId}`);
+      // Notify receiver
+      io.to(`user:${data.receiverId}`).emit("message_reaction", data);
+      // Notify sender (for multi-tab sync)
+      io.to(`user:${data.userId}`).emit("message_reaction", data);
+    });
+
+    // Handle message edit
+    socket.on("message_edited", (data: { messageId: string; userId: string; receiverId: string; content: string; edits: any[] }) => {
+      console.log(`✍️ [Server] Message Edited: ${data.messageId}`);
+      io.to(`user:${data.receiverId}`).emit("message_edited", data);
+      io.to(`user:${data.userId}`).emit("message_edited", data);
+    });
+
+    // Handle message deletion
+    socket.on("message_deleted", (data: { messageId: string; userId: string; receiverId: string }) => {
+      console.log(`🗑️ [Server] Message Deleted: ${data.messageId}`);
+      io.to(`user:${data.receiverId}`).emit("message_deleted", data);
+      io.to(`user:${data.userId}`).emit("message_deleted", data);
+    });
+
     socket.on("typing", (data: { userId: string; isTyping: boolean }) => {
       const senderId = socket.userId;
       if (senderId) {
+        // Notify receiver
         io.to(`user:${data.userId}`).emit("typing", {
           userId: senderId,
           isTyping: data.isTyping
         });
+
+        // Notify other tabs of same user
+        socket.to(`user:${senderId}`).emit("typing", {
+          userId: senderId, // This allows the user to know THEY are typing elsewhere
+          isTyping: data.isTyping,
+          receiverId: data.userId // Context on WHICH chat they are typing in
+        });
+
         console.log(`⌨️ Typing indicator: ${senderId} → ${data.userId} (${data.isTyping})`);
+      }
+    });
+
+    // Handle presence updates (Active/Away)
+    socket.on("update_presence", (data: { status: "online" | "away" }) => {
+      const userId = socket.userId;
+      if (userId) {
+        console.log(`👤 [Server] Presence Update: ${userId} is now ${data.status}`);
+
+        // Map "away" to "away" and "online" to "online"
+        const status = data.status === "away" ? "away" : "online";
+
+        // Broadcast to all users
+        io.emit("user_status", {
+          userId,
+          status,
+          lastSeen: data.status === "away" ? new Date().toISOString() : null
+        });
       }
     });
 

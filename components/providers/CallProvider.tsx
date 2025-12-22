@@ -274,16 +274,16 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
             <AnimatePresence>
                 {callActive && (
                     <div className="fixed inset-0 z-[9999] pointer-events-none flex items-center justify-center">
-                        {/* Incoming Call Notification (Sleek Card) */}
+                        {/* Incoming Call Notification (Top-Right Card) */}
                         {incomingCall && !callAccepted && (
                             <motion.div
-                                initial={{ opacity: 0, y: -50, scale: 0.9 }}
-                                animate={{ opacity: 1, y: 0, scale: 1 }}
-                                exit={{ opacity: 0, y: -50, scale: 0.9 }}
-                                className="pointer-events-auto w-full max-w-sm mx-4 p-4 bg-[#1a1a1a]/80 backdrop-blur-2xl border border-white/10 rounded-3xl shadow-2xl flex items-center gap-4 mt-10 md:mt-20 self-start lg:self-center"
+                                initial={{ opacity: 0, x: 100, scale: 0.9 }}
+                                animate={{ opacity: 1, x: 0, scale: 1 }}
+                                exit={{ opacity: 0, x: 100, scale: 0.9 }}
+                                className="pointer-events-auto absolute top-4 right-4 w-full max-w-sm p-4 bg-[#1a1a1a]/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl flex items-center gap-3"
                             >
                                 <div className="relative">
-                                    <Avatar className="w-16 h-16 border-2 border-[#3b82f6]">
+                                    <Avatar className="w-14 h-14 border-2 border-[#3b82f6]">
                                         <img src={incomingCall.avatar || "/default-avatar.png"} alt={incomingCall.name} />
                                     </Avatar>
                                     <motion.div
@@ -293,59 +293,64 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
                                     />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <h3 className="text-white font-bold truncate">{incomingCall.name}</h3>
-                                    <p className="text-white/60 text-sm">Incoming {incomingCall.isVideo ? "Video" : "Voice"} Call</p>
+                                    <h3 className="text-white font-bold truncate text-sm">{incomingCall.name}</h3>
+                                    <p className="text-white/60 text-xs">Incoming {incomingCall.isVideo ? "Video" : "Voice"} Call</p>
                                 </div>
                                 <div className="flex gap-2">
                                     <Button
                                         onClick={leaveCall}
                                         variant="danger"
                                         size="icon"
-                                        className="w-10 h-10 rounded-full shadow-lg shadow-red-500/20"
+                                        className="w-10 h-10 rounded-full shadow-lg shadow-red-500/20 flex-shrink-0"
                                     >
-                                        <PhoneOff className="w-5 h-5" />
+                                        <PhoneOff className="w-4 h-4" />
                                     </Button>
                                     <Button
                                         onClick={answerCall}
-                                        className="w-12 h-12 rounded-full bg-green-500 hover:bg-green-600 shadow-lg shadow-green-500/20"
+                                        className="w-10 h-10 rounded-full bg-green-500 hover:bg-green-600 shadow-lg shadow-green-500/20 flex-shrink-0"
                                     >
-                                        {incomingCall.isVideo ? <Video className="w-6 h-6 text-white" /> : <Phone className="w-6 h-6 text-white" />}
+                                        {incomingCall.isVideo ? <Video className="w-4 h-4 text-white" /> : <Phone className="w-4 h-4 text-white" />}
                                     </Button>
                                 </div>
                             </motion.div>
                         )}
 
-                        {/* Outgoing Call Notification */}
+                        {/* Outgoing Call Screen (Compact & Clean) */}
                         {outgoingCall && !callAccepted && (
                             <motion.div
-                                initial={{ opacity: 0, scale: 0.9 }}
+                                initial={{ opacity: 0, scale: 0.95 }}
                                 animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.9 }}
-                                className="pointer-events-auto text-center space-y-6 p-10 bg-[#000]/80 backdrop-blur-3xl rounded-[40px] border border-white/5 shadow-2xl w-full max-w-md mx-4"
+                                exit={{ opacity: 0, scale: 0.95 }}
+                                className="pointer-events-auto text-center space-y-6 p-8 bg-[#000]/90 backdrop-blur-3xl rounded-3xl border border-white/5 shadow-2xl w-full max-w-sm mx-4"
                             >
                                 <div className="relative inline-block">
-                                    <Avatar className="w-32 h-32 border-4 border-[#3b82f6]/50 shadow-2xl shadow-[#3b82f6]/20">
+                                    <Avatar className="w-24 h-24 border-4 border-[#3b82f6]/50 shadow-2xl shadow-[#3b82f6]/20">
                                         <img src={outgoingCall.userAvatar || "/default-avatar.png"} alt={outgoingCall.userName} />
                                     </Avatar>
                                     <motion.div
-                                        animate={{ rotate: 360 }}
-                                        transition={{ repeat: Infinity, duration: 8, ease: "linear" }}
-                                        className="absolute -inset-4 rounded-full border-2 border-dashed border-[#3b82f6]/30"
+                                        animate={{ scale: [1, 1.15, 1], opacity: [0.4, 0.1, 0.4] }}
+                                        transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+                                        className="absolute -inset-3 rounded-full border-2 border-[#3b82f6]"
+                                    />
+                                    <motion.div
+                                        animate={{ scale: [1, 1.3, 1], opacity: [0.3, 0, 0.3] }}
+                                        transition={{ repeat: Infinity, duration: 2, ease: "easeInOut", delay: 0.5 }}
+                                        className="absolute -inset-3 rounded-full border-2 border-[#3b82f6]/50"
                                     />
                                 </div>
                                 <div>
-                                    <h2 className="text-3xl font-black text-white tracking-tight">{outgoingCall.userName}</h2>
+                                    <h2 className="text-2xl font-bold text-white">{outgoingCall.userName}</h2>
                                     <div className="flex items-center justify-center gap-2 mt-2">
-                                        <span className="w-2 h-2 rounded-full bg-[#3b82f6] animate-pulse" />
-                                        <p className="text-white/40 font-medium uppercase tracking-widest text-xs">Calling...</p>
+                                        <span className="w-1.5 h-1.5 rounded-full bg-[#3b82f6] animate-pulse" />
+                                        <p className="text-white/50 font-medium uppercase tracking-wider text-xs">Calling...</p>
                                     </div>
                                 </div>
                                 <Button
                                     onClick={leaveCall}
                                     variant="danger"
-                                    className="w-20 h-20 rounded-full shadow-2xl shadow-red-500/40 hover:scale-110 transition-transform duration-300"
+                                    className="w-16 h-16 rounded-full shadow-2xl shadow-red-500/40 hover:scale-110 transition-transform duration-300"
                                 >
-                                    <PhoneOff className="w-10 h-10" />
+                                    <PhoneOff className="w-8 h-8" />
                                 </Button>
                             </motion.div>
                         )}

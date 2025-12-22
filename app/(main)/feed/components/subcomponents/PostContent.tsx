@@ -1,9 +1,10 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import PollComponent from "@/components/post/PollComponent";
 
 interface PostContentProps {
     post: any;
@@ -12,6 +13,10 @@ interface PostContentProps {
     pollVotes: any[];
     totalPollVotes: number;
     handlePollVote: (index: number) => void;
+    explanation?: string | null;
+    isExplaining?: boolean;
+    onExplainCode?: () => void;
+    onFormatCode?: () => void;
 }
 
 export default function PostContent({
@@ -21,6 +26,10 @@ export default function PostContent({
     pollVotes,
     totalPollVotes,
     handlePollVote,
+    explanation,
+    isExplaining,
+    onExplainCode,
+    onFormatCode,
 }: PostContentProps) {
     return (
         <div className="space-y-4">
@@ -38,34 +47,80 @@ export default function PostContent({
                 </motion.div>
             )}
 
+            {/* Code Snippet */}
+            {post.codeSnippet && (
+                <div className="mt-4 rounded-xl overflow-hidden border border-gray-700 bg-gray-900 shadow-2xl">
+                    <div className="flex items-center justify-between px-4 py-2 bg-gray-800/50 border-b border-gray-700">
+                        <div className="flex items-center gap-2">
+                            <Badge variant="default" className="bg-purple-500/10 text-purple-400 border-purple-500/20">
+                                {post.codeSnippet.language}
+                            </Badge>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={onFormatCode}
+                                className="text-[10px] uppercase tracking-wider font-bold text-gray-400 hover:text-white transition px-2 py-1 rounded hover:bg-gray-700"
+                            >
+                                Format
+                            </button>
+                            <button
+                                onClick={onExplainCode}
+                                disabled={isExplaining}
+                                className="text-[10px] uppercase tracking-wider font-bold text-purple-400 hover:text-purple-300 transition px-2 py-1 rounded hover:bg-purple-500/10 flex items-center gap-1"
+                            >
+                                <Zap size={10} className={isExplaining ? "animate-pulse" : ""} />
+                                {isExplaining ? "Explaining..." : "Explain"}
+                            </button>
+                        </div>
+                    </div>
+                    <pre className="p-4 text-xs font-mono text-gray-300 overflow-x-auto bg-[#0d1117]">
+                        <code>{post.codeSnippet.code}</code>
+                    </pre>
+
+                    {/* AI Explanation */}
+                    <AnimatePresence>
+                        {explanation && (
+                            <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: "auto" }}
+                                className="bg-purple-500/5 border-t border-purple-500/10 p-4"
+                            >
+                                <div className="flex items-start gap-3">
+                                    <div className="shrink-0 p-1.5 rounded-lg bg-purple-500/20 text-purple-400 mt-0.5">
+                                        <Zap size={14} />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <h4 className="text-[11px] font-bold text-purple-400 uppercase tracking-widest">AI Explanation</h4>
+                                        <p className="text-sm text-gray-300 leading-relaxed italic">
+                                            {explanation}
+                                        </p>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
+            )}
+
             {/* Main Content */}
             <p className="text-gray-200 whitespace-pre-wrap leading-relaxed">{post.content}</p>
 
             {/* Poll */}
             {post.type === "poll" && post.pollOptions && (
-                <div className="space-y-3 p-4 bg-gray-800/40 rounded-xl border border-gray-700/50">
-                    {pollVotes.map((opt, i) => {
-                        const percentage = totalPollVotes === 0 ? 0 : Math.round((opt.votes / totalPollVotes) * 100);
-                        const isSelected = selectedPollOption === opt.option;
-
-                        return (
-                            <div key={i} className="space-y-1.5 cursor-pointer group" onClick={() => handlePollVote(i)}>
-                                <div className="flex justify-between text-sm">
-                                    <span className={`font-medium ${isSelected ? "text-purple-400" : "text-gray-300"}`}>{opt.option}</span>
-                                    <span className="text-gray-500">{percentage}%</span>
-                                </div>
-                                <div className="relative h-2 w-full bg-gray-700/50 rounded-full overflow-hidden">
-                                    <motion.div
-                                        initial={{ width: 0 }}
-                                        animate={{ width: `${percentage}%` }}
-                                        className={`h-full ${isSelected ? "bg-gradient-to-r from-purple-500 to-blue-500" : "bg-gray-600"} transition-all`}
-                                    />
-                                </div>
-                            </div>
-                        );
-                    })}
-                    <div className="text-xs text-gray-500 mt-2">{totalPollVotes} votes</div>
-                </div>
+                <PollComponent
+                    poll={{
+                        question: post.title || "Poll",
+                        options: post.pollOptions.map((opt: any, idx: number) => ({
+                            id: idx,
+                            text: opt.option,
+                            votes: opt.votes || 0
+                        })),
+                        totalVotes: totalPollVotes,
+                        userVote: post.userPollVote // Assuming this comes from backend eventually
+                    }}
+                    pollId={post.id}
+                    postId={post.id}
+                />
             )}
 
             {/* Images */}
@@ -93,7 +148,7 @@ export default function PostContent({
             {post.hashtags && post.hashtags.length > 0 && (
                 <div className="flex flex-wrap gap-2 pt-2">
                     {post.hashtags.map((tag: string) => (
-                        <Badge key={tag} variant="secondary" className="bg-gray-800/50 hover:bg-purple-500/10 hover:text-purple-400 cursor-pointer transition">
+                        <Badge key={tag} variant="default" className="bg-gray-800/50 hover:bg-purple-500/10 hover:text-purple-400 cursor-pointer transition">
                             #{tag}
                         </Badge>
                     ))}

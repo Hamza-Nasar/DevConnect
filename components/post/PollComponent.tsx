@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { BarChart3 } from "lucide-react";
+import getSocket from "@/lib/socket";
 
 interface PollOption {
     id: number;
@@ -30,6 +31,29 @@ export default function PollComponent({ poll, pollId, postId }: PollComponentPro
     const [isVoting, setIsVoting] = useState(false);
     const [hasVoted, setHasVoted] = useState(!!poll.userVote);
 
+    useEffect(() => {
+        const socket = getSocket();
+        if (!socket) return;
+
+        const handlePollUpdate = (data: { pollId: string; voteCounts: number[]; totalVotes: number }) => {
+            if (data.pollId === pollId || data.pollId === postId) {
+                setLocalPoll((prev) => ({
+                    ...prev,
+                    options: prev.options.map((opt, idx) => ({
+                        ...opt,
+                        votes: data.voteCounts[idx]
+                    })),
+                    totalVotes: data.totalVotes
+                }));
+            }
+        };
+
+        socket.on("poll_update", handlePollUpdate);
+        return () => {
+            socket.off("poll_update", handlePollUpdate);
+        };
+    }, [pollId, postId]);
+
     const handleVote = async (optionId: number) => {
         if (!session || hasVoted || isVoting) return;
 
@@ -53,7 +77,7 @@ export default function PollComponent({ poll, pollId, postId }: PollComponentPro
             const res = await fetch("/api/polls", {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ pollId, optionId }),
+                body: JSON.stringify({ pollId, optionId, postId }),
             });
 
             if (!res.ok) {
@@ -93,13 +117,12 @@ export default function PollComponent({ poll, pollId, postId }: PollComponentPro
                             key={option.id}
                             onClick={() => handleVote(option.id)}
                             disabled={hasVoted || isVoting}
-                            className={`w-full p-3 rounded-lg border-2 transition text-left ${
-                                isSelected
+                            className={`w-full p-3 rounded-lg border-2 transition text-left ${isSelected
                                     ? "border-blue-500 bg-blue-500/20"
                                     : hasVoted
-                                    ? "border-gray-600 bg-gray-700/50 cursor-not-allowed"
-                                    : "border-gray-600 hover:border-blue-500 hover:bg-gray-700/50"
-                            }`}
+                                        ? "border-gray-600 bg-gray-700/50 cursor-not-allowed"
+                                        : "border-gray-600 hover:border-blue-500 hover:bg-gray-700/50"
+                                }`}
                         >
                             <div className="flex items-center justify-between mb-1">
                                 <span className="text-white">{option.text}</span>

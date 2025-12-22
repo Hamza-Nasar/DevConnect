@@ -20,6 +20,9 @@ import {
   Video as VideoIcon,
   FileText,
   ArrowLeft,
+  Edit2,
+  Reply,
+  X,
 } from "lucide-react";
 import Navbar from "@/components/navbar/Navbar";
 import { Card } from "@/components/ui/card";
@@ -35,48 +38,13 @@ import toast from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import EmojiPicker from "emoji-picker-react";
+import MessageItem from "./components/MessageItem";
+import ThreadPanel from "./components/ThreadPanel";
+import { Message, Chat } from "@/types/chat";
 // @ts-ignore
 import { useCall } from "@/components/providers/CallProvider";
 
-interface Message {
-  id: string;
-  content: string;
-  senderId: string;
-  receiverId: string;
-  createdAt: string;
-  read: boolean;
-  type?: "text" | "image" | "file" | "video";
-  imageUrl?: string;
-  videoUrl?: string;
-  fileUrl?: string;
-  fileName?: string;
-  sender?: {
-    id: string;
-    name?: string;
-    avatar?: string;
-  };
-}
-
-interface Chat {
-  id: string;
-  userId: string;
-  user: {
-    id: string;
-    name?: string;
-    username?: string;
-    avatar?: string;
-    status?: "online" | "offline" | "away";
-    lastSeen?: string;
-    verified?: boolean;
-    alternativeIds?: string[];
-  };
-  lastMessage?: {
-    content: string;
-    createdAt: string;
-    read: boolean;
-  };
-  unreadCount: number;
-}
+// Types moved to @/types/chat
 
 export default function ChatPage() {
   const { data: session, status } = useSession();
@@ -103,6 +71,9 @@ export default function ChatPage() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadingMessageId, setUploadingMessageId] = useState<string | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [editingMessage, setEditingMessage] = useState<Message | null>(null);
+  const [replyingToMessage, setReplyingToMessage] = useState<Message | null>(null);
+  const [activeThread, setActiveThread] = useState<Message | null>(null);
 
   const [socketStatus, setSocketStatus] = useState<'connected' | 'disconnected'>('disconnected');
   const [socketId, setSocketId] = useState<string | null>(null);
@@ -286,8 +257,20 @@ export default function ChatPage() {
       });
     };
 
-    const onTyping = (data: { userId: string; isTyping: boolean }) => {
+    const onTyping = (data: { userId: string; isTyping: boolean; receiverId?: string }) => {
       console.log("⌨️ [Socket] Typing Event:", data);
+      const currentUserId = session?.user?.id;
+
+      // If it's ME typing on another tab
+      if (data.userId === currentUserId) {
+        if (data.receiverId === selectedChatRef.current?.userId) {
+          // If I'm typing for the SAME receiver in another tab, maybe sync the input?
+          // For now, just logging it.
+          console.log("⌨️ [Socket] I am typing in another tab for this same chat.");
+        }
+        return;
+      }
+
       const currentSelected = selectedChatRef.current;
       if (!currentSelected) return;
 
@@ -318,6 +301,15 @@ export default function ChatPage() {
           chat.userId === data.userId
             ? { ...chat, lastMessage: chat.lastMessage ? { ...chat.lastMessage, read: true } : undefined, unreadCount: data.messageId === "all" ? 0 : chat.unreadCount }
             : chat
+        )
+      );
+    };
+
+    const onMessageDelivered = (data: { messageId: string; userId: string; deliveredAt: Date }) => {
+      console.log("\u2705 [Socket] Message Delivered Receipt:", data);
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === data.messageId ? { ...m, delivered: true, deliveredAt: data.deliveredAt } : m
         )
       );
     };
@@ -362,9 +354,34 @@ export default function ChatPage() {
     socket.on("new_message", onNewMessage);
     socket.on("typing", onTyping);
     socket.on("message_read", onMessageRead);
+    socket.on("message_delivered", onMessageDelivered);
     socket.on("user_status", onUserStatus);
     socket.on("media_upload_progress", onMediaUploadProgress);
     socket.on("media_uploaded", onMediaUploadComplete);
+
+    const onMessageReaction = (data: { messageId: string; reactions: any[] }) => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === data.messageId ? { ...m, reactions: data.reactions } : m
+        )
+      );
+    };
+
+    const onMessageEdited = (data: { messageId: string; content: string; edits: any[] }) => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === data.messageId ? { ...m, content: data.content, edits: data.edits } : m
+        )
+      );
+    };
+
+    const onMessageDeleted = (data: { messageId: string }) => {
+      setMessages((prev) => prev.filter((m) => m.id !== data.messageId));
+    };
+
+    socket.on("message_reaction", onMessageReaction);
+    socket.on("message_edited", onMessageEdited);
+    socket.on("message_deleted", onMessageDeleted);
 
     // Debug: Log ALL socket events to see what's being received
     const debugHandler = (eventName: string, ...args: any[]) => {
@@ -382,6 +399,7 @@ export default function ChatPage() {
       socket.off("new_message", onNewMessage);
       socket.off("typing", onTyping);
       socket.off("message_read", onMessageRead);
+      socket.off("message_delivered", onMessageDelivered);
       socket.off("user_status", onUserStatus);
       socket.off("media_upload_progress", onMediaUploadProgress);
       socket.off("media_uploaded", onMediaUploadComplete);
@@ -391,6 +409,27 @@ export default function ChatPage() {
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
       }
+    };
+  }, [session?.user?.id]);
+
+  // Presence Tracking (Active/Away)
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket || !session?.user?.id) return;
+
+    const handlePresenceChange = (status: "online" | "away") => {
+      socket.emit("update_presence", { status });
+    };
+
+    const onFocus = () => handlePresenceChange("online");
+    const onBlur = () => handlePresenceChange("away");
+
+    window.addEventListener("focus", onFocus);
+    window.addEventListener("blur", onBlur);
+
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("blur", onBlur);
     };
   }, [session?.user?.id]);
 
@@ -654,33 +693,64 @@ export default function ChatPage() {
 
     scrollToBottom();
 
+    scrollToBottom();
+
     try {
-      const res = await fetch("/api/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          receiverId: selectedChat.userId,
-          content: messageInput,
-        }),
-      });
+      if (editingMessage) {
+        const res = await fetch(`/api/messages/${editingMessage.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content: messageInput.trim() }),
+        });
 
-      if (res.ok) {
-        const data = await res.json();
-        // Replace temp message with real one
-        setMessages((prev) =>
-          prev.map((m) => (m.id === tempId ? data.message : m))
-        );
+        if (res.ok) {
+          const data = await res.json();
+          setMessages((prev) =>
+            prev.map((m) => (m.id === editingMessage.id ? { ...m, content: data.content, edits: data.edits } : m))
+          );
 
-        if (socket) {
-          socket.emit("send_message", {
-            message: data.message,
-            receiverId: selectedChat.userId,
-          });
+          if (socket) {
+            socket.emit("message_edited", {
+              messageId: editingMessage.id,
+              userId: session?.user?.id,
+              receiverId: selectedChat.userId,
+              content: data.content,
+              edits: data.edits,
+            });
+          }
+          setEditingMessage(null);
+          toast.success("Message updated");
         }
       } else {
-        // Remove failed message
-        setMessages((prev) => prev.filter((m) => m.id !== tempId));
-        toast.error("Failed to send message");
+        const res = await fetch("/api/messages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            receiverId: selectedChat.userId,
+            content: messageInput.trim(),
+            parentMessageId: replyingToMessage?.id,
+          }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          // Replace temp message with real one
+          setMessages((prev) =>
+            prev.map((m) => (m.id === tempId ? data.message : m))
+          );
+
+          if (socket) {
+            socket.emit("send_message", {
+              message: data.message,
+              receiverId: selectedChat.userId,
+            });
+          }
+          setReplyingToMessage(null);
+        } else {
+          // Remove failed message
+          setMessages((prev) => prev.filter((m) => m.id !== tempId));
+          toast.error("Failed to send message");
+        }
       }
     } catch (error) {
       console.error("Error sending message:", error);
@@ -736,6 +806,97 @@ export default function ChatPage() {
     }
   };
 
+  const handleMessageReaction = async (messageId: string, emoji: string) => {
+    if (!selectedChat) return;
+    try {
+      const res = await fetch(`/api/messages/${messageId}/reactions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emoji }),
+      });
+
+      if (res.ok) {
+        const { reactions } = await res.json();
+        // Optimistic update
+        setMessages((prev) =>
+          prev.map((m) => (m.id === messageId ? { ...m, reactions } : m))
+        );
+
+        // Emit to socket
+        const socket = getSocket();
+        if (socket) {
+          socket.emit("message_reaction", {
+            messageId,
+            userId: session?.user?.id,
+            receiverId: selectedChat.userId,
+            reactions,
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error toggling reaction:", error);
+    }
+  };
+
+  const handleSendThreadMessage = async (content: string, parentMessageId: string) => {
+    if (!selectedChat) return;
+
+    try {
+      const res = await fetch("/api/messages/threads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          receiverId: selectedChat.userId,
+          content,
+          parentMessageId,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+
+        // Notify socket
+        const socket = getSocket();
+        if (socket) {
+          socket.emit("send_message", {
+            message: data.message,
+            receiverId: selectedChat.userId,
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error sending thread message:", error);
+      throw error;
+    }
+  };
+
+  const deleteMessage = async (messageId: string) => {
+    if (!selectedChat) return;
+    if (!confirm("Are you sure you want to delete this message?")) return;
+
+    try {
+      const res = await fetch(`/api/messages/${messageId}`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        setMessages((prev) => prev.filter((m) => m.id !== messageId));
+        const socket = getSocket();
+        if (socket) {
+          socket.emit("message_deleted", {
+            messageId,
+            userId: session?.user?.id,
+            receiverId: selectedChat.userId,
+          });
+        }
+        toast.success("Message deleted");
+      }
+    } catch (error) {
+      console.error("Error deleting message:", error);
+      toast.error("Failed to delete message");
+    }
+  };
+
   const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !selectedChat) return;
@@ -744,9 +905,9 @@ export default function ChatPage() {
     setUploadProgress(0);
     const tempMessageId = Date.now().toString();
     setUploadingMessageId(tempMessageId);
-    
+
     const socket = getSocket();
-    
+
     try {
       // Emit upload start event for realtime notification
       if (socket) {
@@ -760,12 +921,12 @@ export default function ChatPage() {
 
       // Convert to base64 with progress tracking
       const reader = new FileReader();
-      
+
       reader.onprogress = (event) => {
         if (event.lengthComputable) {
           const percentLoaded = Math.round((event.loaded / event.total) * 100);
           setUploadProgress(percentLoaded);
-          
+
           // Emit progress update in realtime
           if (socket) {
             socket.emit("media_upload_progress", {
@@ -834,14 +995,14 @@ export default function ChatPage() {
           setMessages((prev) =>
             prev.map((m) => (m.id === tempMessageId ? data.message : m))
           );
-          
+
           if (socket) {
             // Emit message sent event
             socket.emit("send_message", {
               message: data.message,
               receiverId: selectedChat.userId,
             });
-            
+
             // Emit media upload complete event for realtime updates
             socket.emit("media_uploaded", {
               messageId: data.message.id,
@@ -851,7 +1012,7 @@ export default function ChatPage() {
               success: true,
             });
           }
-          
+
           toast.success(`${isImage ? "Image" : isVideo ? "Video" : "File"} uploaded successfully!`);
         } else {
           // Remove failed message
@@ -1085,7 +1246,7 @@ export default function ChatPage() {
                 <>
                   {/* Chat Header - Enhanced */}
                   <div className="p-3 sm:p-4 border-b border-gray-700/50 bg-gradient-to-r from-purple-600/10 to-blue-600/10 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <div className="flex items-center gap-2 min-w-0 flex-1 overflow-x-auto scrollbar-hide">
                       <Button
                         variant="ghost"
                         size="icon"
@@ -1125,7 +1286,7 @@ export default function ChatPage() {
                                   : "bg-muted-foreground"
                                 }`}
                             />
-                            <p className="text-xs sm:text-sm text-muted-foreground truncate">
+                            <p className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">
                               {selectedChat.user.status === "online"
                                 ? "Online"
                                 : selectedChat.user.status === "away"
@@ -1138,12 +1299,12 @@ export default function ChatPage() {
                         </div>
                       </Link>
                     </div>
-                    <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+                    <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => callUser(selectedChat.userId, false)}
-                        className="hover:bg-green-500/10 h-8 w-8 sm:h-10 sm:w-10"
+                        className="hover:bg-green-500/10 h-9 w-9 sm:h-10 sm:w-10 flex items-center justify-center"
                         title="Voice Call"
                       >
                         <Phone className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
@@ -1152,12 +1313,12 @@ export default function ChatPage() {
                         variant="ghost"
                         size="icon"
                         onClick={() => callUser(selectedChat.userId, true)}
-                        className="hover:bg-blue-500/10 h-8 w-8 sm:h-10 sm:w-10"
+                        className="hover:bg-blue-500/10 h-9 w-9 sm:h-10 sm:w-10 flex items-center justify-center"
                         title="Video Call"
                       >
                         <Video className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-10 sm:w-10 hidden sm:flex">
+                      <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-10 sm:w-10 hidden sm:flex items-center justify-center">
                         <MoreVertical className="h-4 w-4 sm:h-5 sm:w-5" />
                       </Button>
                     </div>
@@ -1172,109 +1333,22 @@ export default function ChatPage() {
                           index === 0 ||
                           messages[index - 1]?.senderId !== message.senderId
                         );
-                        const showTime =
-                          index === messages.length - 1 ||
-                          new Date(message.createdAt).getTime() -
-                          new Date(messages[index + 1].createdAt).getTime() >
-                          5 * 60 * 1000;
 
                         return (
-                          <motion.div
+                          <MessageItem
                             key={message.id}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.9 }}
-                            className={`flex ${isOwn ? "justify-end" : "justify-start"} ${showTime ? "mb-4" : ""
-                              }`}
-                          >
-                            <div className={`flex items-end gap-1.5 sm:gap-2 max-w-[90%] sm:max-w-[85%] lg:max-w-[75%] ${isOwn ? "flex-row-reverse" : "flex-row"}`}>
-                              {showAvatar && !isOwn && (
-                                <RealTimeAvatar
-                                  userId={message.sender?.id}
-                                  src={message.sender?.avatar}
-                                  alt={message.sender?.name || "User"}
-                                  size="sm"
-                                  className="flex-shrink-0"
-                                  // @ts-ignore
-                                  alternativeIds={message.sender?.alternativeIds}
-                                />
-                              )}
-                              {!showAvatar && !isOwn && <div className="w-8 flex-shrink-0" />}
-                              <div className="flex flex-col gap-1">
-                                {message.type === "image" && message.imageUrl && (
-                                  <div className="rounded-2xl overflow-hidden max-w-xs mb-2">
-                                    <img
-                                      src={message.imageUrl}
-                                      alt="Shared image"
-                                      className="w-full h-auto max-h-64 object-cover cursor-pointer hover:opacity-90 transition rounded-lg"
-                                      onClick={() => {
-                                        const newWindow = window.open();
-                                        if (newWindow) {
-                                          newWindow.document.write(`<img src="${message.imageUrl}" style="max-width:100%;height:auto;" />`);
-                                        }
-                                      }}
-                                    />
-                                  </div>
-                                )}
-                                {message.type === "video" && message.videoUrl && (
-                                  <div className="rounded-2xl overflow-hidden max-w-xs mb-2">
-                                    <video
-                                      src={message.videoUrl}
-                                      controls
-                                      className="w-full h-auto max-h-64 object-cover rounded-lg"
-                                      preload="metadata"
-                                    >
-                                      Your browser does not support the video tag.
-                                    </video>
-                                  </div>
-                                )}
-                                {message.type === "file" && (
-                                  <div className="flex items-center gap-2 p-3 bg-gray-800/50 rounded-lg mb-2">
-                                    <FileText className="h-5 w-5 text-blue-400 flex-shrink-0" />
-                                    <span className="text-sm text-white truncate">
-                                      {message.fileName || "File"}
-                                    </span>
-                                    {message.fileUrl && (
-                                      <a
-                                        href={message.fileUrl}
-                                        download={message.fileName}
-                                        className="ml-auto text-blue-400 hover:text-blue-300 text-xs"
-                                      >
-                                        Download
-                                      </a>
-                                    )}
-                                  </div>
-                                )}
-                                <div
-                                  className={`rounded-2xl px-4 py-2.5 ${isOwn
-                                    ? "bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-br-md"
-                                    : "bg-gray-800 text-gray-100 rounded-bl-md"
-                                    }`}
-                                >
-                                  {message.type === "text" && (
-                                    <p className="text-sm whitespace-pre-wrap break-words">
-                                      {formatMessageContent(message.content)}
-                                    </p>
-                                  )}
-                                  <div
-                                    className={`flex items-center gap-1 mt-1.5 text-xs ${isOwn ? "text-white/70" : "text-gray-400"
-                                      }`}
-                                  >
-                                    <span>{formatTimeAgo(message.createdAt)}</span>
-                                    {isOwn && (
-                                      <span>
-                                        {message.read ? (
-                                          <CheckCheck className="h-3 w-3 text-blue-400" />
-                                        ) : (
-                                          <Check className="h-3 w-3" />
-                                        )}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </motion.div>
+                            message={message}
+                            isOwn={isOwn}
+                            showAvatar={showAvatar}
+                            onReaction={(emoji) => handleMessageReaction(message.id, emoji)}
+                            onReply={() => setActiveThread(message)}
+                            onEdit={(content) => {
+                              setEditingMessage(message);
+                              setMessageInput(content);
+                            }}
+                            onDelete={() => deleteMessage(message.id)}
+                            formatContent={formatMessageContent}
+                          />
                         );
                       })}
                     </AnimatePresence>
@@ -1287,15 +1361,15 @@ export default function ChatPage() {
                         transition={{ type: "spring", stiffness: 300, damping: 20 }}
                         className="flex justify-start"
                       >
-                        <div className="bg-gradient-to-br from-gray-800 via-gray-800/90 to-gray-800 rounded-2xl rounded-bl-md px-5 py-3.5 shadow-lg border border-gray-700/50 backdrop-blur-sm">
-                          <div className="flex items-center gap-2">
-                            <div className="flex gap-1.5">
+                        <div className="bg-gradient-to-br from-gray-800 via-gray-800/90 to-gray-800 rounded-full px-2.5 py-1.5 shadow-md border border-gray-700/30 backdrop-blur-sm">
+                          <div className="flex items-center gap-1.5">
+                            <div className="flex gap-0.5">
                               <motion.div
-                                className="w-2.5 h-2.5 rounded-full bg-gradient-to-br from-purple-400 to-blue-400"
+                                className="w-1 h-1 rounded-full bg-gradient-to-br from-purple-400 to-blue-400"
                                 animate={{
-                                  y: [0, -8, 0],
-                                  scale: [1, 1.2, 1],
-                                  opacity: [0.5, 1, 0.5],
+                                  y: [0, -3, 0],
+                                  scale: [1, 1.1, 1],
+                                  opacity: [0.6, 1, 0.6],
                                 }}
                                 transition={{
                                   duration: 0.6,
@@ -1304,11 +1378,11 @@ export default function ChatPage() {
                                 }}
                               />
                               <motion.div
-                                className="w-2.5 h-2.5 rounded-full bg-gradient-to-br from-purple-400 to-blue-400"
+                                className="w-1 h-1 rounded-full bg-gradient-to-br from-purple-400 to-blue-400"
                                 animate={{
-                                  y: [0, -8, 0],
-                                  scale: [1, 1.2, 1],
-                                  opacity: [0.5, 1, 0.5],
+                                  y: [0, -3, 0],
+                                  scale: [1, 1.1, 1],
+                                  opacity: [0.6, 1, 0.6],
                                 }}
                                 transition={{
                                   duration: 0.6,
@@ -1318,11 +1392,11 @@ export default function ChatPage() {
                                 }}
                               />
                               <motion.div
-                                className="w-2.5 h-2.5 rounded-full bg-gradient-to-br from-purple-400 to-blue-400"
+                                className="w-1 h-1 rounded-full bg-gradient-to-br from-purple-400 to-blue-400"
                                 animate={{
-                                  y: [0, -8, 0],
-                                  scale: [1, 1.2, 1],
-                                  opacity: [0.5, 1, 0.5],
+                                  y: [0, -3, 0],
+                                  scale: [1, 1.1, 1],
+                                  opacity: [0.6, 1, 0.6],
                                 }}
                                 transition={{
                                   duration: 0.6,
@@ -1333,11 +1407,11 @@ export default function ChatPage() {
                               />
                             </div>
                             <motion.span
-                              className="text-xs text-gray-400 font-medium ml-1"
-                              animate={{ opacity: [0.5, 1, 0.5] }}
+                              className="text-[9px] text-gray-500 font-medium"
+                              animate={{ opacity: [0.6, 1, 0.6] }}
                               transition={{ duration: 1.5, repeat: Infinity }}
                             >
-                              typing...
+                              typing
                             </motion.span>
                           </div>
                         </div>
@@ -1392,13 +1466,13 @@ export default function ChatPage() {
 
                   {/* Message Input - Enhanced */}
                   <div className="p-2 sm:p-4 border-t border-gray-700/50 bg-gray-900/50">
-                    <div className="flex items-end gap-1.5 sm:gap-2">
-                      <div className="relative">
+                    <div className="flex items-center gap-2">
+                      <div className="relative flex-shrink-0">
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={() => setShowMediaMenu(!showMediaMenu)}
-                          className="hover:bg-purple-500/20"
+                          className="hover:bg-purple-500/20 h-10 w-10"
                         >
                           <Paperclip className="h-5 w-5" />
                         </Button>
@@ -1437,67 +1511,98 @@ export default function ChatPage() {
                           </div>
                         )}
                       </div>
-                      <Input
-                        type="text"
-                        placeholder="Type a message..."
-                        value={messageInput}
-                        onChange={(e) => handleTyping(e.target.value)}
-                        onKeyPress={(e) => {
-                          if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault();
-                            sendMessage();
-                          }
-                        }}
-                        className="flex-1 bg-gray-800/50 border-gray-700 focus:border-purple-500 min-h-[44px]"
-                      />
-                      <div className="relative">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                          className="hover:bg-yellow-500/20"
-                        >
-                          <Smile className="h-5 w-5 text-yellow-400" />
-                        </Button>
-                        {showEmojiPicker && (
-                          <div className="absolute bottom-full right-0 mb-2 z-50">
-                            <EmojiPicker
-                              onEmojiClick={(emojiData) => {
-                                setMessageInput((prev) => prev + emojiData.emoji);
-                                setShowEmojiPicker(false);
+
+                      {/* Message Input */}
+                      <div className="flex-1 flex flex-col gap-1">
+                        {(editingMessage || replyingToMessage) && (
+                          <div className="flex items-center justify-between px-3 py-1 bg-gray-800 rounded-t-lg border-x border-t border-gray-700">
+                            <span className="text-xs text-gray-400 font-medium flex items-center gap-2">
+                              {editingMessage ? (
+                                <><Edit2 className="h-3 w-3" /> Editing message</>
+                              ) : (
+                                <><Reply className="h-3 w-3" /> Replying to {replyingToMessage?.sender?.name || "User"}</>
+                              )}
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5"
+                              onClick={() => {
+                                setEditingMessage(null);
+                                setReplyingToMessage(null);
+                                if (editingMessage) setMessageInput("");
                               }}
-                              theme={"dark" as any}
-                            />
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
                           </div>
                         )}
+                        <Input
+                          type="text"
+                          placeholder={editingMessage ? "Edit message..." : "Type a message..."}
+                          value={messageInput}
+                          onChange={(e) => handleTyping(e.target.value)}
+                          onKeyPress={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              sendMessage();
+                            }
+                          }}
+                          className={`flex-1 bg-gray-800/50 border-gray-700 focus:border-purple-500 min-h-[44px] ${(editingMessage || replyingToMessage) ? "rounded-t-none" : ""
+                            }`}
+                        />
                       </div>
-                      <Button
-                        variant="primary"
-                        size="icon"
-                        onClick={sendMessage}
-                        disabled={!messageInput.trim() || uploadingMedia}
-                        className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:opacity-50"
-                      >
-                        {uploadingMedia ? (
-                          <motion.div
-                            className="relative"
-                            animate={{ rotate: 360 }}
-                            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      <div className="relative">
+                        <div className="relative">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                            className="hover:bg-yellow-500/20"
                           >
-                            <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" />
-                          </motion.div>
-                        ) : (
-                          <Send className="h-5 w-5" />
-                        )}
-                      </Button>
+                            <Smile className="h-5 w-5 text-yellow-400" />
+                          </Button>
+                          {showEmojiPicker && (
+                            <div className="absolute bottom-full right-0 mb-2 z-50">
+                              <EmojiPicker
+                                onEmojiClick={(emojiData) => {
+                                  setMessageInput((prev) => prev + emojiData.emoji);
+                                  setShowEmojiPicker(false);
+                                }}
+                                theme={"dark" as any}
+                              />
+                            </div>
+                          )}
+                        </div>
+                        <Button
+                          variant="primary"
+                          size="icon"
+                          onClick={sendMessage}
+                          disabled={!messageInput.trim() || uploadingMedia}
+                          className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:opacity-50"
+                        >
+                          {uploadingMedia ? (
+                            <motion.div
+                              className="relative"
+                              animate={{ rotate: 360 }}
+                              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                            >
+                              <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" />
+                            </motion.div>
+                          ) : (
+                            <Send className="h-5 w-5" />
+                          )}
+                        </Button>
+                      </div>
+
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*,video/*,.pdf,.doc,.docx"
+                        onChange={handleMediaUpload}
+                        className="hidden"
+                      />
                     </div>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*,video/*,.pdf,.doc,.docx"
-                      onChange={handleMediaUpload}
-                      className="hidden"
-                    />
                   </div>
                 </>
               ) : (
@@ -1517,6 +1622,18 @@ export default function ChatPage() {
           </div>
         </div>
       </div>
+
+      {/* Thread Panel */}
+      <AnimatePresence>
+        {activeThread && (
+          <ThreadPanel
+            parentMessage={activeThread}
+            onClose={() => setActiveThread(null)}
+            onSendMessage={handleSendThreadMessage}
+            formatContent={formatMessageContent}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

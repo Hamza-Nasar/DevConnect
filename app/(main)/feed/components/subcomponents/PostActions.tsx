@@ -18,7 +18,7 @@ interface PostActionsProps {
     onShare: () => void;
     onBookmark: () => void;
     onSummarize: () => void;
-    onExplainCode?: () => void;
+    onExplain?: () => void;
     hasCode: boolean;
     isSummarizing: boolean;
     isExplaining: boolean;
@@ -37,7 +37,7 @@ export default function PostActions({
     onShare,
     onBookmark,
     onSummarize,
-    onExplainCode,
+    onExplain,
     hasCode,
     isSummarizing,
     isExplaining,
@@ -85,11 +85,11 @@ export default function PostActions({
                     {isSummarizing ? "Summarizing..." : "AI Summary"}
                 </Button>
 
-                {hasCode && onExplainCode && (
+                {hasCode && onExplain && (
                     <Button
                         variant="ghost"
                         size="sm"
-                        onClick={onExplainCode}
+                        onClick={onExplain}
                         disabled={isExplaining}
                         className="bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 rounded-full px-4"
                     >

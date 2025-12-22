@@ -3,6 +3,7 @@
 
 interface PostMetrics {
     id: string;
+    type?: string;
     likesCount: number;
     commentsCount: number;
     sharesCount: number;
@@ -10,12 +11,15 @@ interface PostMetrics {
     createdAt: Date;
     userId: string;
     hashtags: string[];
+    hasCode?: boolean;
+    content: string;
 }
 
 interface UserPreferences {
     followedUsers: string[];
     likedHashtags: string[];
     interactedUsers: string[];
+    mood?: string;
 }
 
 export function calculatePostScore(
@@ -25,37 +29,59 @@ export function calculatePostScore(
 ): number {
     let score = 0;
 
-    // 1. Engagement Score (40% weight)
+    // 1. Engagement Score (35% weight)
     const engagementScore =
-        post.likesCount * 1 +
-        post.commentsCount * 2 +
-        post.sharesCount * 3 +
+        post.likesCount * 1.5 +
+        post.commentsCount * 3 +
+        post.sharesCount * 5 +
         post.viewsCount * 0.1;
-    score += engagementScore * 0.4;
+    score += engagementScore * 0.35;
 
-    // 2. Recency Score (30% weight)
-    const hoursSincePost = (currentTime.getTime() - post.createdAt.getTime()) / (1000 * 60 * 60);
-    const recencyScore = Math.max(0, 100 - hoursSincePost * 2); // Decay over time
-    score += recencyScore * 0.3;
+    // 2. Recency Score (25% weight)
+    const msSincePost = currentTime.getTime() - post.createdAt.getTime();
+    const hoursSincePost = msSincePost / (1000 * 60 * 60);
+    // Exponential decay is better for "Advanced" ranking
+    const recencyScore = 100 * Math.exp(-hoursSincePost / 24);
+    score += recencyScore * 0.25;
 
-    // 3. Social Connection Score (20% weight)
-    let connectionScore = 0;
+    // 3. Social & Relevance Score (20% weight)
+    let relevanceScore = 0;
     if (userPrefs.followedUsers.includes(post.userId)) {
-        connectionScore += 50; // Posts from followed users
+        relevanceScore += 50;
     }
     if (userPrefs.interactedUsers.includes(post.userId)) {
-        connectionScore += 25; // Posts from users you've interacted with
+        relevanceScore += 30;
     }
-    score += connectionScore * 0.2;
 
-    // 4. Interest Score (10% weight)
-    const interestScore = post.hashtags.reduce((acc, tag) => {
-        if (userPrefs.likedHashtags.includes(tag)) {
-            return acc + 10;
-        }
-        return acc;
-    }, 0);
-    score += Math.min(interestScore, 100) * 0.1;
+    // Hashtag affinity
+    const tagMatchCount = post.hashtags.filter(tag => userPrefs.likedHashtags.includes(tag)).length;
+    relevanceScore += Math.min(tagMatchCount * 15, 60);
+
+    score += relevanceScore * 0.2;
+
+    // 4. Content Quality & Bonuses (20% weight)
+    let qualityScore = 0;
+
+    // Code bonus
+    if (post.hasCode) qualityScore += 30;
+
+    // Poll bonus (active polls are engaging)
+    if (post.type === "poll") qualityScore += 25;
+
+    // Sentiment alignment (bonus for positive/inspiring content)
+    const sentiment = analyzeSentiment(post.content);
+    if (sentiment === "positive") qualityScore += 10;
+
+    // Content depth
+    const wordCount = post.content.split(/\s+/).length;
+    if (wordCount > 50) qualityScore += 20; // Reward meaningful content
+
+    // Mood alignment
+    if (userPrefs.mood && post.content.toLowerCase().includes(userPrefs.mood.toLowerCase())) {
+        qualityScore += 40;
+    }
+
+    score += Math.min(qualityScore, 100) * 0.2;
 
     return score;
 }

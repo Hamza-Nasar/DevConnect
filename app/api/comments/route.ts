@@ -14,7 +14,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const { postId, content } = await req.json();
+        const { postId, content, parentId } = await req.json();
         if (!postId || !content?.trim()) {
             return NextResponse.json({ error: "Post ID and content required" }, { status: 400 });
         }
@@ -28,6 +28,7 @@ export async function POST(req: Request) {
             postId: postId,
             userId: session.user.id,
             content: content.trim(),
+            parentId: parentId || null,
         });
 
         // Update post comments count
@@ -63,6 +64,7 @@ export async function POST(req: Request) {
             content: comment?.content,
             createdAt: comment?.createdAt,
             postId: postId,
+            parentId: comment?.parentId || null,
             user: {
                 id: toStringId(user?._id),
                 name: user?.name || null,
@@ -72,9 +74,9 @@ export async function POST(req: Request) {
         };
 
         // Get updated comments count
-        const commentsCount = postIdObj 
-          ? (await postsCollection.findOne({ _id: postIdObj }))?.commentsCount || 0
-          : 0;
+        const commentsCount = postIdObj
+            ? (await postsCollection.findOne({ _id: postIdObj }))?.commentsCount || 0
+            : 0;
 
         // Emit real-time comment creation via Socket.io
         try {
@@ -124,6 +126,7 @@ export async function GET(req: Request) {
                     id: toStringId(c._id),
                     content: c.content,
                     createdAt: c.createdAt,
+                    parentId: c.parentId || null,
                     user: {
                         id: toStringId(user?._id),
                         name: user?.name || null,

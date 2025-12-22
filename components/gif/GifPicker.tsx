@@ -36,8 +36,6 @@ export default function GifPicker({ onSelect, onClose }: GifPickerProps) {
   const searchGifs = async (query: string) => {
     setIsLoading(true);
     try {
-      // Using Giphy API (you can replace with your own API key)
-      // For now, using a simple mock
       const response = await fetch(
         `https://api.giphy.com/v1/gifs/search?api_key=YOUR_API_KEY&q=${encodeURIComponent(query)}&limit=12`
       ).catch(() => null);
@@ -46,7 +44,6 @@ export default function GifPicker({ onSelect, onClose }: GifPickerProps) {
         const data = await response.json();
         setGifs(data.data.map((gif: any) => gif.images.fixed_height.url));
       } else {
-        // Fallback to trending if API fails
         setGifs(TRENDING_GIFS);
       }
     } catch (error) {
@@ -63,61 +60,72 @@ export default function GifPicker({ onSelect, onClose }: GifPickerProps) {
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: -10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -10 }}
-      className="absolute bottom-full left-0 mb-2 w-96 bg-gray-800 rounded-xl shadow-2xl border border-gray-700 z-50 p-4"
-    >
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-white">GIFs</h3>
-        {onClose && (
+    <>
+      {/* Mobile Backdrop */}
+      <div
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99] md:hidden"
+        onClick={onClose}
+      />
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 20 }}
+        className="fixed bottom-0 left-0 right-0 z-[100] bg-gray-900 rounded-t-2xl shadow-2xl border-t border-gray-800 p-4 md:absolute md:bottom-full md:left-0 md:right-auto md:mb-2 md:w-96 md:rounded-xl md:border md:p-4 md:z-50"
+      >
+        <div className="flex items-center justify-between mb-4 md:mb-3">
+          <div className="flex items-center gap-2">
+            <div className="w-10 h-1 md:hidden bg-gray-700 rounded-full absolute top-2 left-1/2 -translate-x-1/2" />
+            <h3 className="text-base md:text-sm font-semibold text-white">Select GIF</h3>
+          </div>
           <Button
             variant="ghost"
             size="icon"
             onClick={onClose}
-            className="h-6 w-6"
+            className="h-8 w-8 rounded-full bg-gray-800 hover:bg-gray-700"
           >
             <X className="h-4 w-4" />
           </Button>
+        </div>
+
+        {/* Search */}
+        <div className="relative mb-4">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            type="text"
+            placeholder="Search GIFs..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10 bg-gray-800 border-gray-700 h-11 md:h-10"
+          />
+        </div>
+
+        {/* GIFs Grid */}
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 max-h-[40vh] md:max-h-64 overflow-y-auto custom-scrollbar no-scrollbar">
+            {gifs.map((gif, index) => (
+              <button
+                key={index}
+                onClick={() => handleGifClick(gif)}
+                className="relative group rounded-xl overflow-hidden hover:ring-2 hover:ring-purple-500 transition active:scale-95"
+              >
+                <img
+                  src={gif}
+                  alt={`GIF ${index + 1}`}
+                  className="w-full h-32 md:h-24 object-cover"
+                  loading="lazy"
+                />
+                <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </button>
+            ))}
+          </div>
         )}
-      </div>
-
-      {/* Search */}
-      <div className="relative mb-3">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-        <Input
-          type="text"
-          placeholder="Search GIFs..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10 bg-gray-700/50 border-gray-600"
-        />
-      </div>
-
-      {/* GIFs Grid */}
-      {isLoading ? (
-        <div className="flex items-center justify-center py-8">
-          <Loader2 className="h-6 w-6 animate-spin text-purple-400" />
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto custom-scrollbar">
-          {gifs.map((gif, index) => (
-            <button
-              key={index}
-              onClick={() => handleGifClick(gif)}
-              className="relative group rounded-lg overflow-hidden hover:ring-2 hover:ring-purple-500 transition"
-            >
-              <img
-                src={gif}
-                alt={`GIF ${index + 1}`}
-                className="w-full h-24 object-cover"
-              />
-            </button>
-          ))}
-        </div>
-      )}
-    </motion.div>
+      </motion.div>
+    </>
   );
 }
 

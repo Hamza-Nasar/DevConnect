@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { findPostById, deletePost, updatePost, findUserById, toStringId, toObjectId } from "@/lib/db";
+import { findPostById, deletePost, updatePost, findUserById, toStringId, toObjectId, recordAuditLog } from "@/lib/db";
 import { getCollection } from "@/lib/mongodb";
 import { COLLECTIONS } from "@/lib/db";
+import { isModerator } from "@/lib/rbac";
 
 export async function GET(
     req: Request,
@@ -67,11 +68,20 @@ export async function DELETE(
             return NextResponse.json({ error: "Post not found" }, { status: 404 });
         }
 
-        if (post.userId !== session.user.id) {
+        if (post.userId !== session.user.id && !isModerator(session)) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
         await deletePost(id);
+
+        // Record Audit Log
+        await recordAuditLog(session.user.id, "DELETE_POST", {
+            postId: id,
+            postOwnerId: post.userId,
+            reason: post.userId !== session.user.id ? "MODERATION" : "USER_ACTION",
+            userAgent: req.headers.get("user-agent"),
+            ip: req.headers.get("x-forwarded-for") || "unknown"
+        });
 
         // Update user's post count
         const usersCollection = await getCollection(COLLECTIONS.USERS);

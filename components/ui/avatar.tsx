@@ -8,12 +8,13 @@ export interface AvatarProps extends React.ComponentPropsWithoutRef<typeof Avata
   // Legacy props
   src?: string | null;
   alt?: string;
-  size?: "sm" | "md" | "lg" | "xl";
+  size?: "xs" | "sm" | "md" | "lg" | "xl";
   status?: "online" | "offline" | "away" | "busy";
   badge?: React.ReactNode;
 }
 
 const sizeClasses = {
+  xs: "h-6 w-6 text-[10px]",
   sm: "h-8 w-8 text-xs",
   md: "h-10 w-10 text-sm",
   lg: "h-12 w-12 text-base",
@@ -70,7 +71,7 @@ const Avatar = React.forwardRef<
           />
         ) : null}
         <AvatarPrimitive.Fallback className="flex h-full w-full items-center justify-center bg-transparent text-white delay-0">
-          <User className={cn(size === "sm" ? "h-4 w-4" : size === "md" ? "h-5 w-5" : "h-6 w-6")} />
+          <User className={cn(size === "xs" ? "h-3 w-3" : size === "sm" ? "h-4 w-4" : size === "md" ? "h-5 w-5" : "h-6 w-6")} />
         </AvatarPrimitive.Fallback>
       </AvatarPrimitive.Root>
 
@@ -79,7 +80,7 @@ const Avatar = React.forwardRef<
           className={cn(
             "absolute bottom-0 right-0 rounded-full border-2 border-gray-900",
             statusColors[status],
-            size === "sm" ? "h-2.5 w-2.5" : "h-3 w-3"
+            size === "xs" ? "h-2 w-2" : size === "sm" ? "h-2.5 w-2.5" : "h-3 w-3"
           )}
         />
       )}

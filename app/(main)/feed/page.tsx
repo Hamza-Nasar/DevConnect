@@ -17,6 +17,7 @@ export default function FeedPage() {
     const { data: session, status } = useSession();
     const router = useRouter();
     const [isDeleting, setIsDeleting] = useState<string | null>(null);
+    const [activeFilter, setActiveFilter] = useState("All");
 
     useEffect(() => {
         if (status === "unauthenticated") {
@@ -26,6 +27,7 @@ export default function FeedPage() {
             // This should only happen on first signup/login, not on subsequent logins
             // If user already has username in session, they've completed setup
             if (!(session?.user as any)?.username) {
+
                 // Check localStorage to see if user has completed setup before
                 const hasCompletedSetup = localStorage.getItem('profileSetupCompleted');
                 if (!hasCompletedSetup) {
@@ -97,7 +99,7 @@ export default function FeedPage() {
         }
     };
 
-    const [activeFilter, setActiveFilter] = useState("All");
+
 
     return (
         <PageTransition>
