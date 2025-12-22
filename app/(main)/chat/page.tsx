@@ -152,48 +152,9 @@ export default function ChatPage() {
       if (!currentUserId) return;
 
       // Check if message is for current user (as receiver or sender)
-      const isForCurrentUser =
-        message.receiverId === currentUserId ||
-        message.senderId === currentUserId;
+      // const isForCurrentUser = ... (Strict check removed to trust server routing)
 
-      if (!isForCurrentUser) {
-        console.log(`🔍 [Socket] Message not for current user`);
-        // Still update chat list
-        setChats((prev) => {
-          const chatExists = prev.some(c => {
-            const chatUserIds = [c.userId, ...(c.user?.alternativeIds || [])];
-            return chatUserIds.includes(message.senderId) || chatUserIds.includes(message.receiverId);
-          });
-          if (chatExists) {
-            return prev.map((chat) => {
-              const chatUserIds = [chat.userId, ...(chat.user?.alternativeIds || [])];
-              const isRelated = chatUserIds.includes(message.senderId) || chatUserIds.includes(message.receiverId);
-              if (isRelated) {
-                return {
-                  ...chat,
-                  lastMessage: {
-                    content: message.content,
-                    createdAt: message.createdAt,
-                    read: message.read,
-                  },
-                  unreadCount: (message.senderId !== currentUserId && message.receiverId === currentUserId && chat.userId !== currentSelected?.userId)
-                    ? chat.unreadCount + 1
-                    : chat.unreadCount,
-                };
-              }
-              return chat;
-            }).sort((a, b) => {
-              const dateA = a.lastMessage?.createdAt ? new Date(a.lastMessage.createdAt).getTime() : 0;
-              const dateB = b.lastMessage?.createdAt ? new Date(b.lastMessage.createdAt).getTime() : 0;
-              return dateB - dateA;
-            });
-          } else {
-            fetchChats();
-            return prev;
-          }
-        });
-        return;
-      }
+      console.log(`📩 [Socket] Processing message: ${message.id}`);
 
       // Check if message is for currently selected chat
       if (currentSelected) {
@@ -202,8 +163,8 @@ export default function ChatPage() {
         const isReceiverMatch = chatUserIds.includes(message.receiverId);
 
         const isForCurrentChat =
-          (isSenderMatch && message.receiverId === currentUserId) ||
-          (isReceiverMatch && message.senderId === currentUserId);
+          (isSenderMatch) || // Simplified: if sender is the chat user, it's for this chat. receiver is obviously us (verified by server routing)
+          (isReceiverMatch && message.senderId == currentUserId); // And if we sent it, it's for this chat too.
 
         console.log(`🔍 [Socket] Match result: ${isForCurrentChat ? "✅ YES" : "ℹ️ NO"}`);
 

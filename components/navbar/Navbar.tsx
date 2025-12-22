@@ -124,7 +124,7 @@ export default function Navbar() {
       socket.off("new_message", handleNewMessage);
       socket.off("messages_read", handleMessagesRead);
     };
-  }, [session?.user?.id, updateSession]);
+  }, [session?.user?.id]); // Removed updateSession to prevent re-runs, and we only care about user ID changes
 
   const navItems = [
     { icon: Home, label: "Feed", path: "/feed", badge: null },

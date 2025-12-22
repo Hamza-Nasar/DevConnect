@@ -18,10 +18,6 @@ class OnlineStatusStore extends EventEmitter {
         if (!socket) return;
 
         if (this.initialized) {
-            // If already initialized, just ensure we request data again if called
-            if (socket.connected) {
-                socket.emit("get_online_users");
-            }
             return;
         }
 

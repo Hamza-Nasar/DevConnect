@@ -74,7 +74,7 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
 
         socket.on("call_user", (data: any) => {
             console.log("📞 [Global] Incoming Call Event:", data);
-            if (data.from === session.user.id) return;
+            if (data.from == session.user.id) return; // Prevent self-call handling
 
             setIncomingCall({
                 isReceivingCall: true,
