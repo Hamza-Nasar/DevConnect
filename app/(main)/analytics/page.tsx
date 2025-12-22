@@ -126,26 +126,26 @@ export default function AnalyticsPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Header */}
           <div className="mb-8">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
               <div>
-                <h1 className="text-3xl font-bold text-foreground mb-2 flex items-center gap-2">
-                  <BarChart3 className="h-8 w-8 text-primary" />
+                <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-1 sm:mb-2 flex items-center gap-2">
+                  <BarChart3 className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
                   Analytics
                 </h1>
-                <p className="text-muted-foreground">Track your performance and engagement</p>
+                <p className="text-sm sm:text-base text-muted-foreground">Track your performance and engagement</p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0">
                 <select
                   value={timeRange}
                   onChange={(e) => setTimeRange(e.target.value)}
-                  className="px-4 py-2 bg-secondary/50 border border-input rounded-lg text-foreground"
+                  className="px-3 py-1.5 sm:px-4 sm:py-2 bg-secondary/50 border border-input rounded-lg text-sm sm:text-base text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
                 >
                   <option value="7d">Last 7 days</option>
                   <option value="30d">Last 30 days</option>
                   <option value="90d">Last 90 days</option>
                   <option value="all">All time</option>
                 </select>
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" className="whitespace-nowrap">
                   <Download className="h-4 w-4 mr-2" />
                   Export
                 </Button>
@@ -285,41 +285,44 @@ export default function AnalyticsPage() {
             </Card>
           </div>
 
-          {/* Top Posts */}
-          <Card variant="elevated" className="p-6">
-            <h3 className="text-xl font-bold text-foreground mb-4">Top Performing Posts</h3>
-            <div className="space-y-4">
-              {analytics.topPosts.map((post, index) => (
-                <div
-                  key={post.id}
-                  className="flex items-center justify-between p-4 bg-muted/50 rounded-lg"
-                >
-                  <div className="flex items-center gap-4 flex-1">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-600 to-blue-600 flex items-center justify-center text-white font-bold">
-                      {index + 1}
+          <Card variant="elevated" className="overflow-hidden">
+            <div className="p-4 sm:p-6">
+              <h3 className="text-xl font-bold text-foreground mb-4">Top Performing Posts</h3>
+              <div className="space-y-4">
+                {analytics.topPosts.map((post, index) => (
+                  <div
+                    key={post.id}
+                    className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-muted/50 rounded-lg gap-4"
+                  >
+                    <div className="flex items-center gap-4 flex-1 w-full min-w-0">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-600 to-blue-600 flex-shrink-0 flex items-center justify-center text-white font-bold text-sm">
+                        {index + 1}
+                      </div>
+                      <p className="text-muted-foreground flex-1 line-clamp-2 sm:line-clamp-1 break-words">
+                        {post.content}
+                      </p>
                     </div>
-                    <p className="text-muted-foreground flex-1 line-clamp-1">{post.content}</p>
+                    <div className="flex items-center gap-3 sm:gap-4 text-xs sm:text-sm text-muted-foreground w-full sm:w-auto justify-between sm:justify-end border-t sm:border-t-0 pt-3 sm:pt-0 border-muted">
+                      <span className="flex items-center gap-1 group truncate" title="Likes">
+                        <Heart className="h-4 w-4 text-red-500/70 group-hover:text-red-500 transition-colors" />
+                        {formatNumber(post.likes)}
+                      </span>
+                      <span className="flex items-center gap-1 group truncate" title="Comments">
+                        <MessageCircle className="h-4 w-4 text-blue-500/70 group-hover:text-blue-500 transition-colors" />
+                        {formatNumber(post.comments)}
+                      </span>
+                      <span className="flex items-center gap-1 group truncate" title="Shares">
+                        <Share2 className="h-4 w-4 text-purple-500/70 group-hover:text-purple-500 transition-colors" />
+                        {formatNumber(post.shares)}
+                      </span>
+                      <span className="flex items-center gap-1 group truncate" title="Views">
+                        <Eye className="h-4 w-4 text-gray-500/70 group-hover:text-gray-500 transition-colors" />
+                        {formatNumber(post.views)}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <Heart className="h-4 w-4" />
-                      {formatNumber(post.likes)}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <MessageCircle className="h-4 w-4" />
-                      {formatNumber(post.comments)}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Share2 className="h-4 w-4" />
-                      {formatNumber(post.shares)}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Eye className="h-4 w-4" />
-                      {formatNumber(post.views)}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </Card>
         </div>

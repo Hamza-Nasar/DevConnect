@@ -128,6 +128,7 @@ export default function Navbar() {
 
   const navItems = [
     { icon: Home, label: "Feed", path: "/feed", badge: null },
+    { icon: Bell, label: "Notifications", path: "/notifications", badge: null },
     { icon: Search, label: "Explore", path: "/explore", badge: null },
     { icon: TrendingUp, label: "Trending", path: "/trending", badge: "Hot" },
     { icon: Users, label: "Groups", path: "/groups", badge: null },

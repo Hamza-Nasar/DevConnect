@@ -335,7 +335,7 @@ export function initializeSocket(server: HTTPServer) {
             io.to(`user:${post.userId}`).emit("new_comment", commentData);
 
             // Create notification
-            await notificationsCollection.insertOne({
+            const notification = {
               userId: post.userId,
               type: "comment",
               title: "New Comment",
@@ -343,6 +343,14 @@ export function initializeSocket(server: HTTPServer) {
               link: `/feed?post=${data.postId}`,
               read: false,
               createdAt: new Date(),
+            };
+            const notifResult = await notificationsCollection.insertOne(notification);
+
+            // Emit generic notification event
+            io.to(`user:${post.userId}`).emit("notification", {
+              ...notification,
+              _id: notifResult.insertedId.toString(),
+              id: notifResult.insertedId.toString()
             });
           }
 
@@ -409,7 +417,7 @@ export function initializeSocket(server: HTTPServer) {
 
         if (post && data.liked && post.userId !== data.userId) {
           // Create notification for post owner
-          await notificationsCollection.insertOne({
+          const notification = {
             userId: post.userId,
             type: "like",
             title: "New Like",
@@ -417,6 +425,14 @@ export function initializeSocket(server: HTTPServer) {
             link: `/feed?post=${data.postId}`,
             read: false,
             createdAt: new Date(),
+          };
+          const notifResult = await notificationsCollection.insertOne(notification);
+
+          // Emit generic notification event
+          io.to(`user:${post.userId}`).emit("notification", {
+            ...notification,
+            _id: notifResult.insertedId.toString(),
+            id: notifResult.insertedId.toString()
           });
 
           io.to(`user:${post.userId}`).emit("post_liked", { postId: data.postId, liked: data.liked });
@@ -449,7 +465,7 @@ export function initializeSocket(server: HTTPServer) {
         const post = await postsCollection.findOne({ _id: postId });
 
         if (post && post.userId !== data.userId) {
-          await notificationsCollection.insertOne({
+          const notification = {
             userId: post.userId,
             type: "share",
             title: "Post Shared",
@@ -457,6 +473,14 @@ export function initializeSocket(server: HTTPServer) {
             link: `/feed?post=${data.postId}`,
             read: false,
             createdAt: new Date(),
+          };
+          const notifResult = await notificationsCollection.insertOne(notification);
+
+          // Emit generic notification event
+          io.to(`user:${post.userId}`).emit("notification", {
+            ...notification,
+            _id: notifResult.insertedId.toString(),
+            id: notifResult.insertedId.toString()
           });
 
           io.to(`user:${post.userId}`).emit("post_shared", { postId: data.postId });
@@ -528,7 +552,7 @@ export function initializeSocket(server: HTTPServer) {
       try {
         const notificationsCollection = await getCollection(COLLECTIONS.NOTIFICATIONS);
 
-        await notificationsCollection.insertOne({
+        const notification = {
           userId: data.followingId,
           type: "follow",
           title: "New Follower",
@@ -536,6 +560,14 @@ export function initializeSocket(server: HTTPServer) {
           link: `/profile/${data.followerId}`,
           read: false,
           createdAt: new Date(),
+        };
+        const notifResult = await notificationsCollection.insertOne(notification);
+
+        // Emit generic notification event
+        io.to(`user:${data.followingId}`).emit("notification", {
+          ...notification,
+          _id: notifResult.insertedId.toString(),
+          id: notifResult.insertedId.toString()
         });
 
         io.to(`user:${data.followingId}`).emit("new_follower", { followerId: data.followerId });

@@ -807,13 +807,15 @@ export default function ChatPage() {
   const displayChats = searchQuery ? filteredChats : chats;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
-      <Navbar />
-      <div className="pt-16 lg:pl-72 xl:pl-80">
-        <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-2 sm:py-4 lg:py-8">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6 h-[calc(100vh-6rem)] sm:h-[calc(100vh-8rem)] lg:h-[calc(100vh-12rem)]">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 transition-all duration-300">
+      <div className={`${selectedChat ? "hidden lg:block" : "block transition-all duration-300"}`}>
+        <Navbar />
+      </div>
+      <div className={`lg:pl-72 xl:pl-80 transition-all duration-300 ${selectedChat ? "pt-0 lg:pt-16" : "pt-16"}`}>
+        <div className="max-w-7xl mx-auto px-0 sm:px-4 lg:px-8 py-0 sm:py-4 lg:py-8 h-full">
+          <div className={`grid grid-cols-1 lg:grid-cols-3 gap-0 sm:gap-4 lg:gap-6 ${selectedChat ? "h-screen lg:h-[calc(100vh-12rem)]" : "h-[calc(100vh-6rem)] sm:h-[calc(100vh-8rem)] lg:h-[calc(100vh-12rem)]"}`}>
             {/* Chat List - Enhanced Design */}
-            <Card variant="elevated" className={`lg:col-span-1 overflow-hidden flex flex-col ${selectedChat ? "hidden lg:flex" : "flex"}`}>
+            <Card variant="elevated" className={`lg:col-span-1 p-0 overflow-hidden flex flex-col ${selectedChat ? "hidden lg:flex" : "flex"} bg-gray-900/60 backdrop-blur-xl border-gray-800`}>
               <div className="p-4 border-b border-gray-700/50 bg-gradient-to-r from-purple-600/10 to-blue-600/10">
                 <div className="flex items-center justify-between mb-4">
                   <div>
@@ -958,7 +960,7 @@ export default function ChatPage() {
             {/* Chat Window - Enhanced Design */}
             <Card
               variant="elevated"
-              className={`lg:col-span-2 overflow-hidden flex flex-col ${!selectedChat ? "hidden lg:flex" : "flex"}`}
+              className={`lg:col-span-2 p-0 overflow-hidden flex flex-col ${!selectedChat ? "hidden lg:flex" : "flex"} bg-gray-900/60 backdrop-blur-xl border-gray-800`}
             >
               {selectedChat ? (
                 <>
