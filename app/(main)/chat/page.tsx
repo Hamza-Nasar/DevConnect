@@ -47,6 +47,7 @@ interface Message {
   read: boolean;
   type?: "text" | "image" | "file" | "video";
   imageUrl?: string;
+  videoUrl?: string;
   fileUrl?: string;
   fileName?: string;
   sender?: {
@@ -99,6 +100,8 @@ export default function ChatPage() {
   const [showMediaMenu, setShowMediaMenu] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingMedia, setUploadingMedia] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadingMessageId, setUploadingMessageId] = useState<string | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
   const [socketStatus, setSocketStatus] = useState<'connected' | 'disconnected'>('disconnected');
@@ -150,6 +153,24 @@ export default function ChatPage() {
       console.log("🔌 [Socket] Disconnected:", reason);
       setSocketStatus('disconnected');
       setSocketId(null);
+    };
+
+    const onMediaUploadProgress = (data: { receiverId: string; progress: number; fileName: string }) => {
+      if (selectedChatRef.current?.userId === data.receiverId) {
+        setUploadProgress(data.progress);
+      }
+    };
+
+    const onMediaUploadComplete = (data: { messageId: string; receiverId: string; type: string; fileName: string; success: boolean }) => {
+      if (selectedChatRef.current?.userId === data.receiverId) {
+        if (data.success) {
+          setUploadProgress(100);
+          setTimeout(() => {
+            setUploadProgress(0);
+            setUploadingMedia(false);
+          }, 500);
+        }
+      }
     };
 
     const onNewMessage = (message: Message) => {
@@ -342,6 +363,8 @@ export default function ChatPage() {
     socket.on("typing", onTyping);
     socket.on("message_read", onMessageRead);
     socket.on("user_status", onUserStatus);
+    socket.on("media_upload_progress", onMediaUploadProgress);
+    socket.on("media_uploaded", onMediaUploadComplete);
 
     // Debug: Log ALL socket events to see what's being received
     const debugHandler = (eventName: string, ...args: any[]) => {
@@ -360,6 +383,8 @@ export default function ChatPage() {
       socket.off("typing", onTyping);
       socket.off("message_read", onMessageRead);
       socket.off("user_status", onUserStatus);
+      socket.off("media_upload_progress", onMediaUploadProgress);
+      socket.off("media_uploaded", onMediaUploadComplete);
       socket.offAny(debugHandler);
 
       // Cleanup typing timeout
@@ -716,16 +741,50 @@ export default function ChatPage() {
     if (!file || !selectedChat) return;
 
     setUploadingMedia(true);
+    setUploadProgress(0);
+    const tempMessageId = Date.now().toString();
+    setUploadingMessageId(tempMessageId);
+    
+    const socket = getSocket();
+    
     try {
-      // Convert to base64 (in production, upload to CDN)
+      // Emit upload start event for realtime notification
+      if (socket) {
+        socket.emit("media_upload_start", {
+          receiverId: selectedChat.userId,
+          fileName: file.name,
+          fileType: file.type,
+          fileSize: file.size,
+        });
+      }
+
+      // Convert to base64 with progress tracking
       const reader = new FileReader();
+      
+      reader.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percentLoaded = Math.round((event.loaded / event.total) * 100);
+          setUploadProgress(percentLoaded);
+          
+          // Emit progress update in realtime
+          if (socket) {
+            socket.emit("media_upload_progress", {
+              receiverId: selectedChat.userId,
+              progress: percentLoaded,
+              fileName: file.name,
+            });
+          }
+        }
+      };
+
       reader.onload = async (e) => {
+        setUploadProgress(100);
         const base64 = e.target?.result as string;
         const isImage = file.type.startsWith("image/");
         const isVideo = file.type.startsWith("video/");
 
         const message: Message = {
-          id: Date.now().toString(),
+          id: tempMessageId,
           content: isImage ? "[Image]" : isVideo ? "[Video]" : `[File: ${file.name}]`,
           senderId: session?.user?.id || "",
           receiverId: selectedChat.userId,
@@ -733,6 +792,7 @@ export default function ChatPage() {
           read: false,
           type: isImage ? "image" : isVideo ? "video" : "file",
           imageUrl: isImage ? base64 : undefined,
+          videoUrl: isVideo ? base64 : undefined,
           fileUrl: !isImage && !isVideo ? base64 : undefined,
           fileName: file.name,
           sender: {
@@ -742,8 +802,18 @@ export default function ChatPage() {
           },
         };
 
-        setMessages((prev) => [...prev, message]);
+        // Show optimistic message with upload indicator
+        setMessages((prev) => [...prev, { ...message, content: `Uploading ${file.name}...` }]);
         scrollToBottom();
+
+        // Emit upload processing event
+        if (socket) {
+          socket.emit("media_upload_processing", {
+            receiverId: selectedChat.userId,
+            fileName: file.name,
+            type: message.type,
+          });
+        }
 
         const res = await fetch("/api/messages", {
           method: "POST",
@@ -753,6 +823,7 @@ export default function ChatPage() {
             content: message.content,
             type: message.type,
             imageUrl: message.imageUrl,
+            videoUrl: message.videoUrl,
             fileUrl: message.fileUrl,
             fileName: message.fileName,
           }),
@@ -761,23 +832,71 @@ export default function ChatPage() {
         if (res.ok) {
           const data = await res.json();
           setMessages((prev) =>
-            prev.map((m) => (m.id === message.id ? data.message : m))
+            prev.map((m) => (m.id === tempMessageId ? data.message : m))
           );
-          const socket = getSocket();
+          
           if (socket) {
+            // Emit message sent event
             socket.emit("send_message", {
               message: data.message,
               receiverId: selectedChat.userId,
             });
+            
+            // Emit media upload complete event for realtime updates
+            socket.emit("media_uploaded", {
+              messageId: data.message.id,
+              receiverId: selectedChat.userId,
+              type: message.type,
+              fileName: file.name,
+              success: true,
+            });
           }
+          
+          toast.success(`${isImage ? "Image" : isVideo ? "Video" : "File"} uploaded successfully!`);
+        } else {
+          // Remove failed message
+          setMessages((prev) => prev.filter((m) => m.id !== tempMessageId));
+          if (socket) {
+            socket.emit("media_upload_failed", {
+              receiverId: selectedChat.userId,
+              fileName: file.name,
+              error: "Upload failed",
+            });
+          }
+          toast.error("Failed to upload media");
         }
       };
+
+      reader.onerror = () => {
+        setUploadProgress(0);
+        setUploadingMedia(false);
+        setUploadingMessageId(null);
+        if (socket) {
+          socket.emit("media_upload_failed", {
+            receiverId: selectedChat.userId,
+            fileName: file.name,
+            error: "File read error",
+          });
+        }
+        toast.error("Failed to read file");
+      };
+
       reader.readAsDataURL(file);
     } catch (error) {
       console.error("Error uploading media:", error);
+      setUploadProgress(0);
+      if (socket) {
+        socket.emit("media_upload_failed", {
+          receiverId: selectedChat.userId,
+          fileName: file.name,
+          error: "Upload error",
+        });
+      }
       toast.error("Failed to upload media");
     } finally {
       setUploadingMedia(false);
+      setUploadProgress(0);
+      setUploadingMessageId(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
@@ -813,7 +932,7 @@ export default function ChatPage() {
       </div>
       <div className={`lg:pl-72 xl:pl-80 transition-all duration-300 ${selectedChat ? "pt-0 lg:pt-16" : "pt-16"}`}>
         <div className="max-w-7xl mx-auto px-0 sm:px-4 lg:px-8 py-0 sm:py-4 lg:py-8 h-full">
-          <div className={`grid grid-cols-1 lg:grid-cols-3 gap-0 sm:gap-4 lg:gap-6 ${selectedChat ? "h-screen lg:h-[calc(100vh-12rem)]" : "h-[calc(100vh-6rem)] sm:h-[calc(100vh-8rem)] lg:h-[calc(100vh-12rem)]"}`}>
+          <div className={`grid grid-cols-1 lg:grid-cols-3 gap-0 sm:gap-4 lg:gap-6 ${selectedChat ? "h-[100dvh] lg:h-[calc(100vh-12rem)]" : "h-[calc(100dvh-4rem)] sm:h-[calc(100vh-8rem)] lg:h-[calc(100vh-12rem)]"}`}>
             {/* Chat List - Enhanced Design */}
             <Card variant="elevated" className={`lg:col-span-1 p-0 overflow-hidden flex flex-col ${selectedChat ? "hidden lg:flex" : "flex"} bg-gray-900/60 backdrop-blur-xl border-gray-800`}>
               <div className="p-4 border-b border-gray-700/50 bg-gradient-to-r from-purple-600/10 to-blue-600/10">
@@ -1045,7 +1164,7 @@ export default function ChatPage() {
                   </div>
 
                   {/* Messages - Enhanced */}
-                  <div className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6 space-y-3 sm:space-y-4 bg-background/50 custom-scrollbar">
+                  <div className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6 space-y-3 sm:space-y-4 bg-background/50 custom-scrollbar" style={{ maxHeight: 'calc(100dvh - 200px)' }}>
                     <AnimatePresence>
                       {messages.map((message, index) => {
                         const isOwn = message.senderId === session?.user?.id;
@@ -1083,21 +1202,47 @@ export default function ChatPage() {
                               {!showAvatar && !isOwn && <div className="w-8 flex-shrink-0" />}
                               <div className="flex flex-col gap-1">
                                 {message.type === "image" && message.imageUrl && (
-                                  <div className="rounded-2xl overflow-hidden max-w-xs">
+                                  <div className="rounded-2xl overflow-hidden max-w-xs mb-2">
                                     <img
                                       src={message.imageUrl}
                                       alt="Shared image"
-                                      className="w-full h-auto cursor-pointer hover:opacity-90 transition"
-                                      onClick={() => window.open(message.imageUrl, "_blank")}
+                                      className="w-full h-auto max-h-64 object-cover cursor-pointer hover:opacity-90 transition rounded-lg"
+                                      onClick={() => {
+                                        const newWindow = window.open();
+                                        if (newWindow) {
+                                          newWindow.document.write(`<img src="${message.imageUrl}" style="max-width:100%;height:auto;" />`);
+                                        }
+                                      }}
                                     />
                                   </div>
                                 )}
+                                {message.type === "video" && message.videoUrl && (
+                                  <div className="rounded-2xl overflow-hidden max-w-xs mb-2">
+                                    <video
+                                      src={message.videoUrl}
+                                      controls
+                                      className="w-full h-auto max-h-64 object-cover rounded-lg"
+                                      preload="metadata"
+                                    >
+                                      Your browser does not support the video tag.
+                                    </video>
+                                  </div>
+                                )}
                                 {message.type === "file" && (
-                                  <div className="flex items-center gap-2 p-3 bg-gray-800/50 rounded-lg">
-                                    <FileText className="h-5 w-5 text-blue-400" />
+                                  <div className="flex items-center gap-2 p-3 bg-gray-800/50 rounded-lg mb-2">
+                                    <FileText className="h-5 w-5 text-blue-400 flex-shrink-0" />
                                     <span className="text-sm text-white truncate">
                                       {message.fileName || "File"}
                                     </span>
+                                    {message.fileUrl && (
+                                      <a
+                                        href={message.fileUrl}
+                                        download={message.fileName}
+                                        className="ml-auto text-blue-400 hover:text-blue-300 text-xs"
+                                      >
+                                        Download
+                                      </a>
+                                    )}
                                   </div>
                                 )}
                                 <div
@@ -1134,24 +1279,66 @@ export default function ChatPage() {
                       })}
                     </AnimatePresence>
 
-                    {/* Typing Indicator - Enhanced */}
+                    {/* Typing Indicator - Enhanced & Stylish */}
                     {typingUsers.length > 0 && (
                       <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
+                        initial={{ opacity: 0, y: 10, scale: 0.9 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        transition={{ type: "spring", stiffness: 300, damping: 20 }}
                         className="flex justify-start"
                       >
-                        <div className="bg-gray-800 rounded-2xl rounded-bl-md px-4 py-3">
-                          <div className="flex gap-1.5">
-                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
-                            <div
-                              className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                              style={{ animationDelay: "0.1s" }}
-                            />
-                            <div
-                              className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                              style={{ animationDelay: "0.2s" }}
-                            />
+                        <div className="bg-gradient-to-br from-gray-800 via-gray-800/90 to-gray-800 rounded-2xl rounded-bl-md px-5 py-3.5 shadow-lg border border-gray-700/50 backdrop-blur-sm">
+                          <div className="flex items-center gap-2">
+                            <div className="flex gap-1.5">
+                              <motion.div
+                                className="w-2.5 h-2.5 rounded-full bg-gradient-to-br from-purple-400 to-blue-400"
+                                animate={{
+                                  y: [0, -8, 0],
+                                  scale: [1, 1.2, 1],
+                                  opacity: [0.5, 1, 0.5],
+                                }}
+                                transition={{
+                                  duration: 0.6,
+                                  repeat: Infinity,
+                                  ease: "easeInOut",
+                                }}
+                              />
+                              <motion.div
+                                className="w-2.5 h-2.5 rounded-full bg-gradient-to-br from-purple-400 to-blue-400"
+                                animate={{
+                                  y: [0, -8, 0],
+                                  scale: [1, 1.2, 1],
+                                  opacity: [0.5, 1, 0.5],
+                                }}
+                                transition={{
+                                  duration: 0.6,
+                                  repeat: Infinity,
+                                  delay: 0.2,
+                                  ease: "easeInOut",
+                                }}
+                              />
+                              <motion.div
+                                className="w-2.5 h-2.5 rounded-full bg-gradient-to-br from-purple-400 to-blue-400"
+                                animate={{
+                                  y: [0, -8, 0],
+                                  scale: [1, 1.2, 1],
+                                  opacity: [0.5, 1, 0.5],
+                                }}
+                                transition={{
+                                  duration: 0.6,
+                                  repeat: Infinity,
+                                  delay: 0.4,
+                                  ease: "easeInOut",
+                                }}
+                              />
+                            </div>
+                            <motion.span
+                              className="text-xs text-gray-400 font-medium ml-1"
+                              animate={{ opacity: [0.5, 1, 0.5] }}
+                              transition={{ duration: 1.5, repeat: Infinity }}
+                            >
+                              typing...
+                            </motion.span>
                           </div>
                         </div>
                       </motion.div>
@@ -1159,6 +1346,49 @@ export default function ChatPage() {
 
                     <div ref={messagesEndRef} />
                   </div>
+
+                  {/* Upload Progress Indicator - Realtime */}
+                  {uploadingMedia && uploadProgress > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="px-4 py-2 bg-gradient-to-r from-gray-800/90 to-gray-800/70 border-t border-gray-700/50 backdrop-blur-sm"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="flex-shrink-0">
+                          <motion.div
+                            className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center"
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                          >
+                            <Paperclip className="h-4 w-4 text-white" />
+                          </motion.div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-xs font-medium text-gray-300 truncate">
+                              {uploadingMessageId ? "Uploading media..." : "Processing..."}
+                            </span>
+                            <span className="text-xs text-gray-500 font-semibold flex-shrink-0 ml-2">
+                              {uploadProgress}%
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-700/50 rounded-full h-2 overflow-hidden">
+                            <motion.div
+                              className="h-full bg-gradient-to-r from-purple-500 via-blue-500 to-purple-500"
+                              initial={{ width: 0 }}
+                              animate={{ width: `${uploadProgress}%` }}
+                              transition={{ duration: 0.3, ease: "easeOut" }}
+                              style={{
+                                backgroundSize: "200% 100%",
+                                animation: "shimmer 2s infinite",
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
 
                   {/* Message Input - Enhanced */}
                   <div className="p-2 sm:p-4 border-t border-gray-700/50 bg-gray-900/50">
@@ -1246,10 +1476,16 @@ export default function ChatPage() {
                         size="icon"
                         onClick={sendMessage}
                         disabled={!messageInput.trim() || uploadingMedia}
-                        className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                        className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:opacity-50"
                       >
                         {uploadingMedia ? (
-                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
+                          <motion.div
+                            className="relative"
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                          >
+                            <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" />
+                          </motion.div>
                         ) : (
                           <Send className="h-5 w-5" />
                         )}

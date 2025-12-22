@@ -144,7 +144,7 @@ export default function Navbar() {
   const quickActions = [
     { icon: Plus, label: "Create Post", action: () => router.push("/feed") },
     { icon: Video, label: "Go Live", action: () => router.push("/live") },
-    { icon: ImageIcon, label: "Upload Media", action: () => toast("Media uploader coming soon!") },
+    { icon: ImageIcon, label: "Upload Media", action: () => router.push("/create-post") },
     { icon: Code, label: "Code Snippet", action: () => router.push("/code-snippets") },
   ];
 

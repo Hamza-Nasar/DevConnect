@@ -32,6 +32,7 @@ import WebRTCLive from "@/components/live/WebRTCLive";
 import { ScrollReveal } from "@/components/animations/ScrollReveal";
 import { motion } from "framer-motion";
 import toast from "react-hot-toast";
+import getSocket from "@/lib/socket";
 
 interface LiveStream {
   id: string;
@@ -84,12 +85,72 @@ export default function LivePage() {
   }, []);
 
   useEffect(() => {
-    if (selectedStream) {
+    if (selectedStream && session?.user?.id) {
       fetchComments();
-      const interval = setInterval(fetchComments, 2000);
-      return () => clearInterval(interval);
+      fetchLiveStreams();
+      
+      const socket = getSocket();
+      if (socket) {
+        // Join live stream room
+        socket.emit("join_live_stream", { streamId: selectedStream.id });
+        
+        // Listen for realtime updates
+        socket.on("live_comment", (comment: LiveComment) => {
+          if (comment && comment.id) {
+            setComments((prev) => {
+              if (prev.some(c => c.id === comment.id)) return prev;
+              return [...prev, comment];
+            });
+          }
+        });
+        
+        socket.on("live_like", (data: { streamId: string; likesCount: number }) => {
+          if (data.streamId === selectedStream.id) {
+            setSelectedStream((prev) => prev ? { ...prev, likesCount: data.likesCount } : null);
+            setLiveStreams((prev) =>
+              prev.map((s) => s.id === data.streamId ? { ...s, likesCount: data.likesCount } : s)
+            );
+          }
+        });
+        
+        socket.on("live_viewers", (data: { streamId: string; viewersCount: number }) => {
+          if (data.streamId === selectedStream.id) {
+            setSelectedStream((prev) => prev ? { ...prev, viewersCount: data.viewersCount } : null);
+            setLiveStreams((prev) =>
+              prev.map((s) => s.id === data.streamId ? { ...s, viewersCount: data.viewersCount } : s)
+            );
+          }
+        });
+        
+        socket.on("live_gift", (data: { streamId: string; gift: any }) => {
+          if (data.streamId === selectedStream.id && data.gift) {
+            // Add gift as a special comment
+            setComments((prev) => {
+              const giftComment: LiveComment = {
+                id: `gift-${Date.now()}`,
+                user: data.gift.user,
+                message: `sent a ${data.gift.type} gift! 🎁`,
+                timestamp: new Date().toISOString(),
+                isGift: true,
+              };
+              if (prev.some(c => c.id === giftComment.id)) return prev;
+              return [...prev, giftComment];
+            });
+          }
+        });
+      }
+      
+      return () => {
+        if (socket) {
+          socket.emit("leave_live_stream", { streamId: selectedStream.id });
+          socket.off("live_comment");
+          socket.off("live_like");
+          socket.off("live_viewers");
+          socket.off("live_gift");
+        }
+      };
     }
-  }, [selectedStream]);
+  }, [selectedStream, session?.user?.id]);
 
   const fetchLiveStreams = async () => {
     try {
@@ -117,7 +178,7 @@ export default function LivePage() {
   };
 
   const handleSendComment = async () => {
-    if (!commentInput.trim() || !selectedStream) return;
+    if (!commentInput.trim() || !selectedStream || !session?.user?.id) return;
 
     try {
       const res = await fetch(`/api/live/${selectedStream.id}/comments`, {
@@ -127,25 +188,50 @@ export default function LivePage() {
       });
 
       if (res.ok) {
+        const data = await res.json();
         setCommentInput("");
+        
+        // Emit socket event for realtime update
+        const socket = getSocket();
+        if (socket && data.comment) {
+          socket.emit("live_comment", {
+            streamId: selectedStream.id,
+            comment: data.comment,
+          });
+        }
+        
+        // Also fetch to ensure consistency
         fetchComments();
       }
     } catch (error) {
       console.error("Error sending comment:", error);
+      toast.error("Failed to send comment");
     }
   };
 
   const handleLike = async () => {
-    if (!selectedStream) return;
+    if (!selectedStream || !session?.user?.id) return;
     try {
       const res = await fetch(`/api/live/${selectedStream.id}/like`, {
         method: "POST",
       });
       if (res.ok) {
+        const data = await res.json();
+        
+        // Emit socket event for realtime update
+        const socket = getSocket();
+        if (socket) {
+          socket.emit("live_like", {
+            streamId: selectedStream.id,
+            likesCount: data.likesCount || selectedStream.likesCount + 1,
+          });
+        }
+        
         fetchLiveStreams();
       }
     } catch (error) {
       console.error("Error liking stream:", error);
+      toast.error("Failed to like stream");
     }
   };
 
@@ -255,7 +341,34 @@ export default function LivePage() {
                         <Share2 className="h-4 w-4 mr-2" />
                         Share
                       </Button>
-                      <Button variant="outline" size="sm">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={async () => {
+                          if (!selectedStream || !session?.user?.id) return;
+                          try {
+                            // Emit gift event
+                            const socket = getSocket();
+                            if (socket) {
+                              socket.emit("live_gift", {
+                                streamId: selectedStream.id,
+                                gift: {
+                                  type: "heart",
+                                  user: {
+                                    id: session.user.id,
+                                    name: session.user.name,
+                                    avatar: session.user.image,
+                                  },
+                                },
+                              });
+                              toast.success("Gift sent! 🎁");
+                            }
+                          } catch (error) {
+                            console.error("Error sending gift:", error);
+                            toast.error("Failed to send gift");
+                          }
+                        }}
+                      >
                         <Gift className="h-4 w-4 mr-2" />
                         Send Gift
                       </Button>

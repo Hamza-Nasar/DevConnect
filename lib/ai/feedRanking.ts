@@ -91,28 +91,35 @@ export function analyzeSentiment(text: string): "positive" | "neutral" | "negati
 // Auto-hashtag suggestions
 export function suggestHashtags(content: string): string[] {
     const commonHashtags = [
-        "developer",
-        "coding",
-        "programming",
-        "webdev",
-        "javascript",
-        "react",
-        "nextjs",
-        "typescript",
-        "nodejs",
-        "ai",
-        "tech",
-        "software",
+        "developer", "coding", "programming", "webdev", "javascript", "react",
+        "nextjs", "typescript", "nodejs", "ai", "tech", "software", "machinelearning",
+        "python", "frontend", "backend", "fullstack", "cloud", "devops", "database",
+        "security", "mobile", "ios", "android", "uiux", "design", "agile", "startup",
+        "career", "tutorial", "tips", "hacks", "life", "future", "innovation"
     ];
 
     const lowerContent = content.toLowerCase();
-    const suggestions = commonHashtags.filter((tag) => lowerContent.includes(tag));
+
+    // Find matching tags
+    const matchedTags = commonHashtags.filter((tag) => {
+        // Match whole words or part of words if they are long enough
+        const regex = new RegExp(`\\b${tag}|${tag}\\b`, 'i');
+        return regex.test(lowerContent);
+    });
 
     // Extract existing hashtags
-    const existingHashtags = content.match(/#\w+/g) || [];
+    const existingHashtags = content.match(/#(\w+)/g) || [];
     const existing = existingHashtags.map((h) => h.replace("#", ""));
 
-    return [...new Set([...existing, ...suggestions])].slice(0, 5);
+    // Extract potential hashtags from capitalized words (proper nouns/keywords)
+    const capitalWords = content.match(/[A-Z][a-z]+/g) || [];
+    const keywords = capitalWords
+        .filter(w => w.length > 3 && !["This", "That", "There", "When", "Where", "These"].includes(w))
+        .map(w => w.toLowerCase());
+
+    const allSuggestions = [...new Set([...existing, ...matchedTags, ...keywords])];
+
+    return allSuggestions.slice(0, 8);
 }
 
 

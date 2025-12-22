@@ -181,9 +181,9 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { receiverId, content, type = "text" } = body;
+    const { receiverId, content, type = "text", imageUrl, videoUrl, fileUrl, fileName } = body;
 
-    if (!receiverId || !content) {
+    if (!receiverId || (!content && !imageUrl && !videoUrl && !fileUrl)) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
@@ -191,14 +191,20 @@ export async function POST(req: NextRequest) {
     }
 
     const messagesCollection = await getCollection("messages");
-    const message = {
+    const message: any = {
       senderId: session.user.id,
       receiverId,
-      content,
+      content: content || (imageUrl ? "[Image]" : videoUrl ? "[Video]" : fileUrl ? `[File: ${fileName || "File"}]` : ""),
       type,
       read: false,
       createdAt: new Date().toISOString(),
     };
+
+    // Add media URLs if present
+    if (imageUrl) message.imageUrl = imageUrl;
+    if (videoUrl) message.videoUrl = videoUrl;
+    if (fileUrl) message.fileUrl = fileUrl;
+    if (fileName) message.fileName = fileName;
 
     const result = await messagesCollection.insertOne(message);
 

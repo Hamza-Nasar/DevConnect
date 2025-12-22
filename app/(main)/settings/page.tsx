@@ -206,14 +206,15 @@ export default function SettingsPage() {
             },
           });
 
-          // Emit real-time update
-          const socket = getSocket();
-          if (socket) {
-            socket.emit("avatar_updated", {
-              userId: session?.user?.id,
-              avatar: data.avatar || base64Image,
-            });
-          }
+        // Emit real-time update
+        const socket = getSocket();
+        if (socket) {
+          socket.emit("profile_updated", {
+            userId: session?.user?.id,
+            type: "avatar",
+            avatar: data.avatar || base64Image,
+          });
+        }
 
           toast.success("Avatar updated successfully!");
         } else {
@@ -264,6 +265,7 @@ export default function SettingsPage() {
         if (socket) {
           socket.emit("profile_updated", {
             userId: session?.user?.id,
+            type: "profile",
             profile: data.profile || data,
           });
         }
@@ -292,6 +294,15 @@ export default function SettingsPage() {
       });
 
       if (res.ok) {
+        // Emit real-time update
+        const socket = getSocket();
+        if (socket) {
+          socket.emit("settings_updated", {
+            userId: session?.user?.id,
+            type: "privacy",
+            settings: privacy,
+          });
+        }
         toast.success("Privacy settings updated!");
       }
     } catch (error) {
@@ -312,6 +323,15 @@ export default function SettingsPage() {
       });
 
       if (res.ok) {
+        // Emit real-time update
+        const socket = getSocket();
+        if (socket) {
+          socket.emit("settings_updated", {
+            userId: session?.user?.id,
+            type: "notifications",
+            settings: notifications,
+          });
+        }
         toast.success("Notification settings updated!");
       }
     } catch (error) {

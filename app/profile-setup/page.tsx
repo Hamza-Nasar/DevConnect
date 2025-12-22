@@ -168,6 +168,8 @@ export default function ProfileSetupPage() {
                     }
                 });
                 toast.success("Profile setup complete!");
+                // Mark profile setup as completed in localStorage
+                localStorage.setItem('profileSetupCompleted', 'true');
                 // Force full navigation to feed to ensure all state is fresh
                 window.location.href = "/feed";
             } else {

@@ -34,6 +34,8 @@ interface Notification {
     link?: string;
     read: boolean;
     createdAt: string;
+    postId?: string;
+    userId?: string;
     user?: {
         id: string;
         name?: string;
@@ -90,20 +92,39 @@ export default function NotificationsPage() {
         }
     };
 
-    const markAsRead = async (id: string, link?: string) => {
+    const markAsRead = async (notification: Notification) => {
         try {
             const res = await fetch("/api/notifications", {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ notificationId: id }),
+                body: JSON.stringify({ notificationId: notification._id || notification.id }),
             });
 
             if (res.ok) {
                 setNotifications((prev) =>
-                    prev.map((n) => (n._id === id || n.id === id ? { ...n, read: true } : n))
+                    prev.map((n) => (n._id === notification._id || n.id === notification.id ? { ...n, read: true } : n))
                 );
-                if (link) {
-                    router.push(link);
+                
+                // Handle different notification types
+                if (notification.type === "like" && notification.postId) {
+                    // Navigate to feed and scroll to post
+                    router.push(`/feed?postId=${notification.postId}`);
+                    // Scroll to post after navigation
+                    setTimeout(() => {
+                        const postElement = document.getElementById(`post-${notification.postId}`);
+                        if (postElement) {
+                            postElement.scrollIntoView({ behavior: "smooth", block: "center" });
+                            postElement.classList.add("ring-2", "ring-purple-500", "ring-opacity-75");
+                            setTimeout(() => {
+                                postElement.classList.remove("ring-2", "ring-purple-500", "ring-opacity-75");
+                            }, 2000);
+                        }
+                    }, 500);
+                } else if (notification.type === "follow" && notification.userId) {
+                    // Open user profile
+                    router.push(`/profile/${notification.userId}`);
+                } else if (notification.link) {
+                    router.push(notification.link);
                 }
             }
         } catch (error) {
@@ -215,10 +236,9 @@ export default function NotificationsPage() {
                                             animate={{ opacity: 1, y: 0 }}
                                             transition={{ delay: index * 0.03 }}
                                         >
-                                            <Link
-                                                href={notification.link || "#"}
-                                                onClick={() => !notification.read && markAsRead(notification._id || notification.id)}
-                                                className="block"
+                                            <div
+                                                onClick={() => !notification.read && markAsRead(notification)}
+                                                className="block cursor-pointer"
                                             >
                                                 <Card
                                                     variant={notification.read ? "default" : "elevated"}
@@ -270,7 +290,7 @@ export default function NotificationsPage() {
                                                         </div>
                                                     </div>
                                                 </Card>
-                                            </Link>
+                                            </div>
                                         </motion.div>
                                     );
                                 })}

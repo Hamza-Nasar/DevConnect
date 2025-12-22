@@ -35,9 +35,10 @@ interface Post {
 
 interface PostListProps {
   onDelete: (id: string) => void;
+  filter?: string;
 }
 
-export default function PostList({ onDelete }: PostListProps) {
+export default function PostList({ onDelete, filter = "All" }: PostListProps) {
   const { data: session } = useSession();
   const [posts, setPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -48,15 +49,14 @@ export default function PostList({ onDelete }: PostListProps) {
   const hasMountedRef = useRef(false);
 
   const fetchPosts = useCallback(async (pageNum: number = 1, append: boolean = false) => {
-    // Prevent multiple simultaneous requests
     if (isLoadingRef.current) return;
-    
+
     isLoadingRef.current = true;
     setIsLoading(true);
     setError(null);
 
     try {
-      const res = await fetch(`/api/posts?page=${pageNum}&limit=10`);
+      const res = await fetch(`/api/posts?page=${pageNum}&limit=10&filter=${filter}`);
       if (!res.ok) throw new Error("Failed to fetch posts");
 
       const data = await res.json();
@@ -77,15 +77,11 @@ export default function PostList({ onDelete }: PostListProps) {
       setIsLoading(false);
       isLoadingRef.current = false;
     }
-  }, []); // Empty dependency array - function is stable
+  }, [filter]);
 
-  // Only fetch once on mount
   useEffect(() => {
-    if (!hasMountedRef.current) {
-      hasMountedRef.current = true;
-      fetchPosts(1, false);
-    }
-  }, [fetchPosts]);
+    fetchPosts(1, false);
+  }, [filter, fetchPosts]);
 
   // Socket event handlers - separate effect to avoid re-running fetchPosts
   useEffect(() => {
@@ -141,13 +137,13 @@ export default function PostList({ onDelete }: PostListProps) {
         prev.map((p) =>
           p.user?.id === data.userId
             ? {
-                ...p,
-                user: {
-                  ...p.user,
-                  avatar: data.avatar,
-                  image: data.avatar,
-                },
-              }
+              ...p,
+              user: {
+                ...p.user,
+                avatar: data.avatar,
+                image: data.avatar,
+              },
+            }
             : p
         )
       );
