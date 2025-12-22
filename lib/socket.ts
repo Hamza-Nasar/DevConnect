@@ -8,7 +8,7 @@ let socket: CustomSocket | null = null;
 
 export const getSocket = (): CustomSocket | null => {
   if (typeof window === "undefined") return null;
-  
+
   if (!socket) {
     const origin = typeof window !== "undefined" ? window.location.origin.replace(/\/$/, "") : "";
     let socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || origin;
@@ -33,17 +33,15 @@ export const getSocket = (): CustomSocket | null => {
 
     socket = io(socketUrl, {
       path: "/socket.io-custom",
-      transports: ["polling", "websocket"], // Use polling first for better compatibility with Railway/proxies
+      transports: ["websocket", "polling"], // Try websocket first for better stability cross-origin
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-      timeout: 30000,
+      timeout: 20000, // Reduced timeout (standard is 20s)
       withCredentials: true,
       autoConnect: true,
-      // Add extra options for more stability
-      rememberUpgrade: true,
-      forceNew: false,
+      forceNew: true, // Force new connection to avoid stale states
     }) as CustomSocket;
 
     // Diagnostics for Vercel debugging

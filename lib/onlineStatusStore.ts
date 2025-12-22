@@ -8,6 +8,7 @@ class OnlineStatusStore extends EventEmitter {
 
     constructor() {
         super();
+        this.setMaxListeners(100); // Support many active avatars
     }
 
     init() {
