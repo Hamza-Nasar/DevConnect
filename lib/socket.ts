@@ -13,35 +13,51 @@ export const getSocket = (): CustomSocket | null => {
     const origin = typeof window !== "undefined" ? window.location.origin.replace(/\/$/, "") : "";
     let socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || origin;
 
+    // In production, if NEXT_PUBLIC_SOCKET_URL is not set and we're on Vercel, this is a critical error
+    const isVercel = typeof window !== "undefined" && window.location?.hostname?.includes("vercel.app");
+    const isRailway = typeof window !== "undefined" && window.location?.hostname?.includes("railway.app");
+    const isProduction = process.env.NODE_ENV === "production";
+
+    if (isProduction && isVercel && !process.env.NEXT_PUBLIC_SOCKET_URL) {
+      console.error("❌ [Client] CRITICAL: Vercel deployment detected but NEXT_PUBLIC_SOCKET_URL is not set! Socket.io server cannot run on Vercel. Please set NEXT_PUBLIC_SOCKET_URL to your Railway backend URL in Vercel environment variables.");
+      // Don't initialize socket if we can't connect to the right server
+      return null;
+    }
+
     // Ensure socketUrl has protocol
     if (socketUrl && !socketUrl.startsWith("http")) {
       socketUrl = (typeof window !== "undefined" && window.location.protocol === "https:" ? "https://" : "http://") + socketUrl;
     }
 
-    const isVercel = typeof window !== "undefined" && window.location?.hostname?.includes("vercel.app");
-    const isRailway = typeof window !== "undefined" && window.location?.hostname?.includes("railway.app");
-
-    if (isVercel && !process.env.NEXT_PUBLIC_SOCKET_URL) {
-      console.warn("⚠️ [Client] Detected Vercel deployment without NEXT_PUBLIC_SOCKET_URL. Note that Vercel serverless functions cannot host Socket.io servers. If your server is on Railway, set NEXT_PUBLIC_SOCKET_URL to your Railway app URL.");
-    }
+    // Remove trailing slash
+    socketUrl = socketUrl.replace(/\/$/, "");
 
     if (isRailway) {
       console.log("🚂 [Client] Detected Railway deployment. WebSockets should be fully supported.");
     }
 
-    console.log("🔌 [Client] Initializing Socket...", { url: socketUrl, path: "/socket.io-custom" });
+    console.log("🔌 [Client] Initializing Socket...", { 
+      url: socketUrl, 
+      path: "/socket.io-custom",
+      isProduction,
+      isVercel,
+      isRailway 
+    });
 
     socket = io(socketUrl, {
       path: "/socket.io-custom",
-      transports: ["websocket", "polling"], // Try websocket first for better stability cross-origin
+      transports: ["websocket", "polling"], // Try websocket first for better performance
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-      timeout: 20000, // Reduced timeout (standard is 20s)
+      timeout: 20000,
       withCredentials: true,
       autoConnect: true,
-      forceNew: true, // Force new connection to avoid stale states
+      forceNew: true,
+      // Add upgrade timeout for better WebSocket handling
+      upgrade: true,
+      rememberUpgrade: true,
     }) as CustomSocket;
 
     // Diagnostics for Vercel debugging

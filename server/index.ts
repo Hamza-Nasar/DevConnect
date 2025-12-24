@@ -11,16 +11,41 @@ import { setSocketInstance } from "../lib/socket-server";
 import { createNotification } from "../lib/db";
 
 export function initializeSocket(server: HTTPServer) {
+  // Get allowed origins from environment or use default
+  const getAllowedOrigins = (): string[] | boolean => {
+    const allowedOrigins = process.env.ALLOWED_ORIGINS;
+    
+    if (allowedOrigins) {
+      // Split by comma and trim
+      return allowedOrigins.split(',').map(origin => origin.trim());
+    }
+    
+    // In production, allow common origins
+    if (process.env.NODE_ENV === 'production') {
+      return [
+        process.env.NEXTAUTH_URL || '',
+        process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '',
+        process.env.FRONTEND_URL || '',
+      ].filter(Boolean);
+    }
+    
+    // In development, allow all origins
+    return true;
+  };
+
   const io = new SocketIOServer(server, {
     cors: {
-      origin: true,
+      origin: getAllowedOrigins(),
       methods: ["GET", "POST"],
       credentials: true,
+      allowedHeaders: ["Content-Type", "Authorization"],
     },
     path: "/socket.io-custom",
     addTrailingSlash: true,
-    transports: ["polling", "websocket"],
+    transports: ["websocket", "polling"], // WebSocket first for better performance
     allowEIO3: true,
+    pingTimeout: 60000,
+    pingInterval: 25000,
   });
 
   // Make socket instance globally accessible
