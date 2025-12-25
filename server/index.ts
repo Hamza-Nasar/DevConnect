@@ -54,6 +54,9 @@ export function initializeSocket(server: HTTPServer) {
   // Store user socket connections: userId -> Set of socketIds
   const userSockets = new Map<string, Set<string>>();
 
+  // Track OAuth ID for each MongoDB ID (dbId -> oauthId)
+  const userIdMapping = new Map<string, string>();
+
   // Helper: resolve a userId to all possible room names (handles ID mismatch between OAuth/DB)
   const getUserRooms = async (userId: string): Promise<string[]> => {
     const rooms = new Set<string>();
@@ -122,6 +125,11 @@ export function initializeSocket(server: HTTPServer) {
           }
           userSockets.get(dbId)!.add(socket.id);
 
+          // Track the ID mapping so we can return both variants to clients
+          if (oauthId) {
+            userIdMapping.set(dbId, oauthId);
+          }
+
           // Join primary rooms for all variations
           socket.join(`user:${dbId}`);
           if (oauthId && oauthId !== dbId) {
@@ -149,9 +157,14 @@ export function initializeSocket(server: HTTPServer) {
             io.emit("user_status", { userId: oauthId, status: "online", lastSeen: null });
           }
 
-          // Send list of CURRENT online users to the joining user
-          const onlineDbIds = Array.from(userSockets.keys());
-          socket.emit("initial_online_users", onlineDbIds);
+          // Send list of CURRENT online users to the joining user (include both ID variants)
+          const onlineIds: string[] = [];
+          for (const dbId of userSockets.keys()) {
+            onlineIds.push(dbId);
+            const oauthId = userIdMapping.get(dbId);
+            if (oauthId && oauthId !== dbId) onlineIds.push(oauthId);
+          }
+          socket.emit("initial_online_users", onlineIds);
 
         } else {
           // Fallback if user not found in DB yet (rare but possible during first login)
@@ -171,9 +184,14 @@ export function initializeSocket(server: HTTPServer) {
           );
           io.emit("user_status", { userId, status: "online", lastSeen: null });
 
-          // Send list of CURRENT online users to the joining user
-          const onlineDbIds = Array.from(userSockets.keys());
-          socket.emit("initial_online_users", onlineDbIds);
+          // Send list of CURRENT online users to the joining user (include both ID variants)
+          const onlineIdsForFallback: string[] = [];
+          for (const dbId of userSockets.keys()) {
+            onlineIdsForFallback.push(dbId);
+            const mappedOauthId = userIdMapping.get(dbId);
+            if (mappedOauthId && mappedOauthId !== dbId) onlineIdsForFallback.push(mappedOauthId);
+          }
+          socket.emit("initial_online_users", onlineIdsForFallback);
         }
       } catch (error) {
         console.error(`❌ [Server] Join error for ${userId}:`, error);
@@ -181,9 +199,15 @@ export function initializeSocket(server: HTTPServer) {
     });
 
     socket.on("get_online_users", () => {
-      const onlineDbIds = Array.from(userSockets.keys());
-      console.log(`👥 [Server] Sending online users to ${socket.id}: ${onlineDbIds.length}`);
-      socket.emit("initial_online_users", onlineDbIds);
+      // Return both ID variants so clients can match users regardless of ID format
+      const onlineIds: string[] = [];
+      for (const dbId of userSockets.keys()) {
+        onlineIds.push(dbId);
+        const oauthId = userIdMapping.get(dbId);
+        if (oauthId && oauthId !== dbId) onlineIds.push(oauthId);
+      }
+      console.log(`👥 [Server] Sending online users to ${socket.id}: ${onlineIds.length} IDs`);
+      socket.emit("initial_online_users", onlineIds);
     });
 
     // Video/Voice Call Signaling - UPDATED for avatar/video type
