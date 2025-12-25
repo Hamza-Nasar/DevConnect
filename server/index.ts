@@ -91,6 +91,45 @@ export function initializeSocket(server: HTTPServer) {
     return Array.from(rooms);
   };
 
+  // Helper: emit event directly to all socket IDs for a user (bypasses room routing)
+  const emitToUser = async (userId: string, event: string, data: any) => {
+    console.log(`📤 [Server] emitToUser: ${event} to ${userId}`);
+
+    // Try to resolve to MongoDB _id first
+    const usersCollection = await getCollection(COLLECTIONS.USERS);
+    const userIdObj = toObjectId(userId);
+
+    const user = userIdObj
+      ? await usersCollection.findOne({ _id: userIdObj })
+      : await usersCollection.findOne({ id: userId });
+
+    const possibleDbIds: string[] = [userId];
+    if (user) {
+      const dbId = user._id.toString();
+      const oauthId = user.id;
+      if (dbId && !possibleDbIds.includes(dbId)) possibleDbIds.push(dbId);
+      if (oauthId && !possibleDbIds.includes(oauthId)) possibleDbIds.push(oauthId);
+    }
+
+    let emitted = 0;
+    for (const id of possibleDbIds) {
+      const socketIds = userSockets.get(id);
+      if (socketIds) {
+        for (const socketId of socketIds) {
+          const targetSocket = io.sockets.sockets.get(socketId);
+          if (targetSocket) {
+            targetSocket.emit(event, data);
+            emitted++;
+            console.log(`📤 [Server] Emitted ${event} to socket ${socketId} (user: ${id})`);
+          }
+        }
+      }
+    }
+
+    console.log(`📤 [Server] emitToUser: sent to ${emitted} sockets for user ${userId}`);
+    return emitted;
+  };
+
   console.log("🚀 Socket.IO Server Initialized");
 
   io.on("connection", (socket: CustomSocket) => {
@@ -210,13 +249,9 @@ export function initializeSocket(server: HTTPServer) {
       socket.emit("initial_online_users", onlineIds);
     });
 
-    // Video/Voice Call Signaling - UPDATED for avatar/video type
+    // Video/Voice Call Signaling - UPDATED to use direct socket emission
     socket.on("call_user", async (data: { userToCall: string; signalData: unknown; from: string; name: string; avatar: string; isVideo: boolean }) => {
       console.log(`📞 [Server] Call: ${data.from} → ${data.userToCall}`);
-
-      // Resolve receiver to all room variants for cross-auth call delivery
-      const receiverRooms = await getUserRooms(data.userToCall);
-      console.log(`📞 [Server] Resolved receiver rooms: ${receiverRooms.join(", ")}`);
 
       const callData = {
         signal: data.signalData,
@@ -226,28 +261,18 @@ export function initializeSocket(server: HTTPServer) {
         isVideo: data.isVideo
       };
 
-      // Emit to all receiver rooms
-      receiverRooms.forEach(room => {
-        io.to(room).emit("call_user", callData);
-      });
-
-      console.log(`✅ [Server] Call event emitted to ${receiverRooms.length} rooms`);
+      const count = await emitToUser(data.userToCall, "call_user", callData);
+      console.log(`✅ [Server] Call event emitted to ${count} sockets`);
     });
 
     socket.on("answer_call", async (data: { to: string; signal: unknown }) => {
       console.log(`✅ Call answered, signal sent to ${data.to}`);
-      const receiverRooms = await getUserRooms(data.to);
-      receiverRooms.forEach(room => {
-        io.to(room).emit("call_accepted", data.signal);
-      });
+      await emitToUser(data.to, "call_accepted", data.signal);
     });
 
     socket.on("end_call", async (data: { to: string }) => {
       console.log(`📴 Call ended with ${data.to}`);
-      const receiverRooms = await getUserRooms(data.to);
-      receiverRooms.forEach(room => {
-        io.to(room).emit("call_ended");
-      });
+      await emitToUser(data.to, "call_ended", {});
     });
 
     // Join post room for real-time updates
@@ -670,97 +695,53 @@ export function initializeSocket(server: HTTPServer) {
     socket.on("send_message", async (data: { message: { id?: string; senderId: string }; receiverId: string }) => {
       console.log(`💬 [Server] Message: ${data.message.senderId} → ${data.receiverId}`);
 
-      // Resolve both IDs to all room variants for cross-auth delivery
-      const [receiverRooms, senderRooms] = await Promise.all([
-        getUserRooms(data.receiverId),
-        getUserRooms(data.message.senderId)
+      // Use direct socket emission (more reliable than room-based)
+      const [receiverCount, senderCount] = await Promise.all([
+        emitToUser(data.receiverId, "new_message", data.message),
+        emitToUser(data.message.senderId, "new_message", data.message)
       ]);
-
-      console.log(`📡 [Server] Emitting to receiver rooms: ${receiverRooms.join(", ")}`);
-      console.log(`📡 [Server] Emitting to sender rooms: ${senderRooms.join(", ")}`);
-
-      // Emit to all receiver rooms
-      receiverRooms.forEach(room => {
-        io.to(room).emit("new_message", data.message);
-      });
-
-      // Emit to all sender rooms (for other tabs)
-      senderRooms.forEach(room => {
-        io.to(room).emit("new_message", data.message);
-      });
 
       // Send delivery confirmation to sender if message has an ID
       if (data.message.id) {
-        senderRooms.forEach(room => {
-          io.to(room).emit("message_delivered", {
-            messageId: data.message.id,
-            userId: data.receiverId,
-            deliveredAt: new Date()
-          });
+        await emitToUser(data.message.senderId, "message_delivered", {
+          messageId: data.message.id,
+          userId: data.receiverId,
+          deliveredAt: new Date()
         });
       }
 
-      console.log(`✅ [Server] Message delivered to ${receiverRooms.length} receiver rooms and ${senderRooms.length} sender rooms`);
+      console.log(`✅ [Server] Message delivered to ${receiverCount} receiver sockets and ${senderCount} sender sockets`);
     });
 
     // Handle message seen/read
     socket.on("message_read", async (data: { messageId: string; userId: string; senderId: string }) => {
       console.log(`👀 [Server] Message Read: ${data.messageId} by ${data.userId} (Sender: ${data.senderId})`);
-      // Notify the original sender via all their rooms
-      const senderRooms = await getUserRooms(data.senderId);
-      senderRooms.forEach(room => {
-        io.to(room).emit("message_read", {
-          messageId: data.messageId,
-          userId: data.userId
-        });
-      });
+      await emitToUser(data.senderId, "message_read", { messageId: data.messageId, userId: data.userId });
     });
 
     // Handle message reaction
     socket.on("message_reaction", async (data: { messageId: string; userId: string; receiverId: string; reactions: any[] }) => {
       console.log(`❤️ [Server] Reaction: ${data.messageId} from ${data.userId}`);
-      const [receiverRooms, senderRooms] = await Promise.all([getUserRooms(data.receiverId), getUserRooms(data.userId)]);
-      receiverRooms.forEach(room => io.to(room).emit("message_reaction", data));
-      senderRooms.forEach(room => io.to(room).emit("message_reaction", data));
+      await Promise.all([emitToUser(data.receiverId, "message_reaction", data), emitToUser(data.userId, "message_reaction", data)]);
     });
 
     // Handle message edit
     socket.on("message_edited", async (data: { messageId: string; userId: string; receiverId: string; content: string; edits: any[] }) => {
       console.log(`✍️ [Server] Message Edited: ${data.messageId}`);
-      const [receiverRooms, senderRooms] = await Promise.all([getUserRooms(data.receiverId), getUserRooms(data.userId)]);
-      receiverRooms.forEach(room => io.to(room).emit("message_edited", data));
-      senderRooms.forEach(room => io.to(room).emit("message_edited", data));
+      await Promise.all([emitToUser(data.receiverId, "message_edited", data), emitToUser(data.userId, "message_edited", data)]);
     });
 
     // Handle message deletion
     socket.on("message_deleted", async (data: { messageId: string; userId: string; receiverId: string }) => {
       console.log(`🗑️ [Server] Message Deleted: ${data.messageId}`);
-      const [receiverRooms, senderRooms] = await Promise.all([getUserRooms(data.receiverId), getUserRooms(data.userId)]);
-      receiverRooms.forEach(room => io.to(room).emit("message_deleted", data));
-      senderRooms.forEach(room => io.to(room).emit("message_deleted", data));
+      await Promise.all([emitToUser(data.receiverId, "message_deleted", data), emitToUser(data.userId, "message_deleted", data)]);
     });
 
     socket.on("typing", async (data: { userId: string; isTyping: boolean }) => {
       const senderId = socket.userId;
       if (senderId) {
-        // Resolve receiver to all rooms for cross-auth typing indicators
-        const receiverRooms = await getUserRooms(data.userId);
-
-        // Notify receiver via all their rooms
-        receiverRooms.forEach(room => {
-          io.to(room).emit("typing", {
-            userId: senderId,
-            isTyping: data.isTyping
-          });
-        });
-
-        // Notify other tabs of same user
-        socket.to(`user:${senderId}`).emit("typing", {
-          userId: senderId,
-          isTyping: data.isTyping,
-          receiverId: data.userId
-        });
-
+        // Use direct socket emission for typing indicator
+        await emitToUser(data.userId, "typing", { userId: senderId, isTyping: data.isTyping });
         console.log(`⌨️ Typing indicator: ${senderId} → ${data.userId} (${data.isTyping})`);
       }
     });
