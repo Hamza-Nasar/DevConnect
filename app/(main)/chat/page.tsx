@@ -102,6 +102,28 @@ export default function ChatPage() {
     }
   }, [session?.user?.id]);
 
+  // Handle mobile keyboard layout stability
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.visualViewport) return;
+
+    const handleResize = () => {
+      if (!window.visualViewport) return;
+      const chatContainer = document.getElementById('chat-container');
+      if (chatContainer && window.innerWidth < 1024) { // Only on mobile/tablet
+        chatContainer.style.height = `${window.visualViewport.height}px`;
+      }
+    };
+
+    window.visualViewport.addEventListener('resize', handleResize);
+    window.visualViewport.addEventListener('scroll', handleResize);
+    handleResize(); // Initial call
+
+    return () => {
+      window.visualViewport?.removeEventListener('resize', handleResize);
+      window.visualViewport?.removeEventListener('scroll', handleResize);
+    };
+  }, []);
+
   useEffect(() => {
     if (!session?.user?.id) return;
 
@@ -1060,7 +1082,10 @@ export default function ChatPage() {
       </div>
       <div className={`lg:pl-72 xl:pl-80 transition-all duration-300 ${selectedChat ? "pt-0 lg:pt-16" : "pt-16"}`}>
         <div className="max-w-7xl mx-auto px-0 sm:px-4 lg:px-8 py-0 sm:py-4 lg:py-8 h-full">
-          <div className={`grid grid-cols-1 lg:grid-cols-3 gap-0 sm:gap-4 lg:gap-6 ${selectedChat ? "h-[100dvh] lg:h-[calc(100vh-12rem)]" : "h-[calc(100dvh-4rem)] sm:h-[calc(100vh-8rem)] lg:h-[calc(100vh-12rem)]"}`}>
+          <div
+            id="chat-container"
+            className={`grid grid-cols-1 lg:grid-cols-3 gap-0 sm:gap-4 lg:gap-6 ${selectedChat ? "h-[100dvh] lg:h-[calc(100vh-12rem)]" : "h-[calc(100dvh-4rem)] sm:h-[calc(100vh-8rem)] lg:h-[calc(100vh-12rem)]"}`}
+          >
             {/* Chat List - Enhanced Design */}
             <Card variant="elevated" className={`lg:col-span-1 p-0 overflow-hidden flex flex-col ${selectedChat ? "hidden lg:flex" : "flex"} bg-gray-900/60 backdrop-blur-xl border-gray-800`}>
               <div className="p-4 border-b border-gray-700/50 bg-gradient-to-r from-purple-600/10 to-blue-600/10">
@@ -1292,7 +1317,7 @@ export default function ChatPage() {
                   </div>
 
                   {/* Messages - Enhanced */}
-                  <div className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6 space-y-3 sm:space-y-4 bg-background/50 custom-scrollbar" style={{ maxHeight: 'calc(100dvh - 200px)' }}>
+                  <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 lg:p-6 space-y-3 sm:space-y-4 bg-background/50 custom-scrollbar">
                     <AnimatePresence>
                       {messages.map((message, index) => {
                         const isOwn = message.senderId === session?.user?.id;

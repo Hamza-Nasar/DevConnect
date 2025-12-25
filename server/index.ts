@@ -159,10 +159,19 @@ export function initializeSocket(server: HTTPServer) {
           socket.userId = dbId;
           socket.oauthId = oauthId;
 
+          // Store socket under BOTH IDs for reliable lookup
           if (!userSockets.has(dbId)) {
             userSockets.set(dbId, new Set());
           }
           userSockets.get(dbId)!.add(socket.id);
+          
+          // ALSO store under OAuth ID if different
+          if (oauthId && oauthId !== dbId) {
+            if (!userSockets.has(oauthId)) {
+              userSockets.set(oauthId, new Set());
+            }
+            userSockets.get(oauthId)!.add(socket.id);
+          }
 
           // Track the ID mapping so we can return both variants to clients
           if (oauthId) {
@@ -768,51 +777,69 @@ export function initializeSocket(server: HTTPServer) {
       console.log("🔌 Client disconnected:", socket.id);
 
       const userId = socket.userId;
+      const oauthId = socket.oauthId;
+      
+      // Clean up from MongoDB _id key
       if (userId && userSockets.has(userId)) {
         const sockets = userSockets.get(userId)!;
         sockets.delete(socket.id);
-
-        console.log(`🔌 [Server] Socket ${socket.id} removed for user ${userId}. Remaining: ${sockets.size}`);
-
+        console.log(`🔌 [Server] Socket ${socket.id} removed from user ${userId}. Remaining: ${sockets.size}`);
         if (sockets.size === 0) {
           userSockets.delete(userId);
-          const lastSeen = new Date();
+        }
+      }
+      
+      // Also clean up from OAuth ID key if different
+      if (oauthId && oauthId !== userId && userSockets.has(oauthId)) {
+        const sockets = userSockets.get(oauthId)!;
+        sockets.delete(socket.id);
+        console.log(`🔌 [Server] Socket ${socket.id} removed from OAuth ${oauthId}. Remaining: ${sockets.size}`);
+        if (sockets.size === 0) {
+          userSockets.delete(oauthId);
+        }
+      }
 
-          try {
-            const usersCollection = await getCollection(COLLECTIONS.USERS);
-            const userIdObj = toObjectId(userId);
+      // Check if ALL sockets for this user are gone (check both IDs)
+      const userStillConnected = (userId && userSockets.has(userId) && userSockets.get(userId)!.size > 0) ||
+                                  (oauthId && userSockets.has(oauthId) && userSockets.get(oauthId)!.size > 0);
 
-            const user = userIdObj
-              ? await usersCollection.findOne({ _id: userIdObj })
-              : await usersCollection.findOne({ id: userId });
+      if (!userStillConnected && userId) {
+        const lastSeen = new Date();
 
-            if (user) {
-              const dbId = user._id.toString();
-              const oauthId = user.id;
+        try {
+          const usersCollection = await getCollection(COLLECTIONS.USERS);
+          const userIdObj = toObjectId(userId);
 
-              await usersCollection.updateOne(
-                { _id: user._id },
-                { $set: { isOnline: false, lastSeen: lastSeen } }
-              );
+          const user = userIdObj
+            ? await usersCollection.findOne({ _id: userIdObj })
+            : await usersCollection.findOne({ id: userId });
 
-              console.log(`👋 User ${userId} marked as offline (all tabs closed). DB ID: ${dbId}, OAuth ID: ${oauthId}`);
+          if (user) {
+            const dbId = user._id.toString();
+            const userOauthId = user.id;
 
-              // Broadcast for BOTH IDs
-              io.emit("user_status", { userId: dbId, status: "offline", lastSeen });
-              if (oauthId && oauthId !== dbId) {
-                io.emit("user_status", { userId: oauthId, status: "offline", lastSeen });
-              }
-            } else {
-              // Fallback
-              await usersCollection.updateOne(
-                { _id: (userIdObj || userId) as unknown as any },
-                { $set: { isOnline: false, lastSeen: lastSeen } }
-              );
-              io.emit("user_status", { userId, status: "offline", lastSeen });
+            await usersCollection.updateOne(
+              { _id: user._id },
+              { $set: { isOnline: false, lastSeen: lastSeen } }
+            );
+
+            console.log(`👋 User ${userId} marked as offline (all tabs closed). DB ID: ${dbId}, OAuth ID: ${userOauthId}`);
+
+            // Broadcast for BOTH IDs
+            io.emit("user_status", { userId: dbId, status: "offline", lastSeen });
+            if (userOauthId && userOauthId !== dbId) {
+              io.emit("user_status", { userId: userOauthId, status: "offline", lastSeen });
             }
-          } catch (e) {
-            console.error("❌ Error updating last seen", e);
+          } else {
+            // Fallback
+            await usersCollection.updateOne(
+              { _id: (userIdObj || userId) as unknown as any },
+              { $set: { isOnline: false, lastSeen: lastSeen } }
+            );
+            io.emit("user_status", { userId, status: "offline", lastSeen });
           }
+        } catch (e) {
+          console.error("❌ Error updating last seen", e);
         }
       }
     });

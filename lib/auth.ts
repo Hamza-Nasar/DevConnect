@@ -24,7 +24,8 @@ export const authOptions: AuthOptions = {
                 email: { label: "Email", type: "text" },
                 password: { label: "Password", type: "password" },
                 phone: { label: "Phone", type: "text" },
-                guest: { label: "Guest", type: "text" }
+                guest: { label: "Guest", type: "text" },
+                deviceId: { label: "Device ID", type: "text" }
             },
             async authorize(credentials) {
                 // Import dependencies dynamically to avoid circular deps
@@ -34,14 +35,28 @@ export const authOptions: AuthOptions = {
                 // 1. Guest Login
                 if (credentials?.guest === "true") {
                     const usersCollection = await getCollection("users");
+                    const deviceId = credentials?.deviceId;
 
-                    // Generate unique guest identifier
-                    const timestamp = Date.now();
-                    const randomNum = Math.floor(Math.random() * 10000);
-                    const guestId = `guest_${timestamp}_${randomNum}`;
-                    const name = `Guest ${Math.floor(Math.random() * 1000)}`;
-                    const username = `guest_${randomNum}`;
+                    // Check if this device already has a guest account
+                    if (deviceId) {
+                        const existingGuest = await usersCollection.findOne({ guestId: deviceId });
+                        if (existingGuest) {
+                            return {
+                                id: existingGuest._id.toString(),
+                                email: existingGuest.email,
+                                name: existingGuest.name,
+                                username: existingGuest.username,
+                                image: existingGuest.image || existingGuest.avatar,
+                                guestAccount: true
+                            };
+                        }
+                    }
 
+                    // Generate unique guest identifier (or use deviceId if provided)
+                    const guestId = deviceId || `guest_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+                    const randomNum = Math.floor(Math.random() * 1000);
+                    const name = `Guest ${randomNum}`;
+                    const username = `guest_${Math.floor(Math.random() * 10000)}`;
                     const guestEmail = `${guestId}@guest.local`;
 
                     // Create new guest user
@@ -50,7 +65,7 @@ export const authOptions: AuthOptions = {
                         name: name,
                         username: username,
                         guestAccount: true,
-                        guestId: guestId,
+                        guestId: guestId, // Using deviceId or generated ID here
                         emailVerified: false,
                         avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`,
                         createdAt: new Date(),
@@ -95,27 +110,48 @@ export const authOptions: AuthOptions = {
         async session({ session, token }) {
             if (session?.user && token) {
                 // Map from minified keys back to original names
-                session.user.id = (token.d as string) || (token.sub as string) || (token.id as string) || '';
+                // IMPORTANT: session.user.id is now ALWAYS the MongoDB _id (stored in token.d)
+                session.user.id = (token.d as string) || (token.sub as string) || '';
                 session.user.email = (token.e as string) || (token.email as string) || null;
                 session.user.name = (token.n as string) || (token.name as string) || null;
                 session.user.username = (token.u as string) || (token.username as string) || null;
-                session.user.image = (token.p as string) || (token.picture as string) || null;
+
+                // Get the image from the token
+                let image = (token.p as string) || (token.picture as string) || null;
+
+                // If it's a large base64 string, replace it with the proxy URL
+                // This is a safety measure in case the token still has it
+                if (image && image.startsWith('data:image') && image.length > 1000) {
+                    image = `/api/avatars/${session.user.id}?v=${Date.now()}`;
+                }
+
+                session.user.image = image;
                 session.user.role = (token.r as string) || "USER";
 
-                // Add accessToken if needed, but keep it small if possible
+                // Add accessToken if needed
                 if (token.a) (session as any).accessToken = token.a;
             }
             return session;
         },
         async jwt({ token, user, account, trigger, session }) {
+            // Helper to clean image
+            const cleanImage = (id: string, img: string | null | undefined) => {
+                if (img && img.startsWith('data:image') && img.length > 500) {
+                    return `/api/avatars/${id}?v=${Date.now()}`;
+                }
+                return img;
+            };
+
             // For JWT strategy, store user info in token
-            // Mapping short names for compression
             if (user) {
-                token.d = user.id; // Using 'd' for ID
+                // CRITICAL: We want token.d to be the MongoDB _id string.
+                // For Credentials/Guest, user.id is already the _id string.
+                // For Google, we'll fetch it from the DB in the next step or during signIn.
+                token.d = user.id;
                 token.e = user.email;
                 token.n = user.name;
                 token.u = user.username;
-                token.p = user.image || user.avatar;
+                token.p = cleanImage(user.id, user.image || (user as any).avatar);
                 token.r = (user as any).role || "USER";
 
                 // Clear long keys
@@ -125,7 +161,8 @@ export const authOptions: AuthOptions = {
             }
 
             // Ensure we have the MongoDB _id in the token (compressed as 'd')
-            if (!token.d && token.e) {
+            // This is especially important for Google users where user.id is the OAuth ID initially.
+            if (token.e && (!token.d || (token.d as string).length > 24)) {
                 try {
                     const { getCollection } = await import("./mongodb");
                     const usersCollection = await getCollection("users");
@@ -133,6 +170,10 @@ export const authOptions: AuthOptions = {
                     if (dbUser) {
                         token.d = dbUser._id.toString();
                         token.r = dbUser.role || "USER";
+                        // Re-check image if we just found the ID
+                        if (token.p && (token.p as string).startsWith('data:image')) {
+                            token.p = cleanImage(token.d as string, token.p as string);
+                        }
                     }
                 } catch (e) {
                     console.error("Error fetching dbId for token:", e);
@@ -143,15 +184,17 @@ export const authOptions: AuthOptions = {
             if (trigger === "update" && session?.user) {
                 if (session.user.username) token.u = session.user.username;
                 if (session.user.name) token.n = session.user.name;
-                if (session.user.image) token.p = session.user.image;
+                if (session.user.image) {
+                    const userId = (token.d as string) || (token.sub as string);
+                    token.p = cleanImage(userId, session.user.image);
+                }
             }
 
             if (account) {
-                // Keep accessToken but use short key 'a'
                 token.a = account.access_token;
             }
 
-            // Final cleanup of any potential long keys that NextAuth might have injected
+            // Cleanup
             delete (token as any).name;
             delete (token as any).email;
             delete (token as any).picture;
@@ -159,37 +202,19 @@ export const authOptions: AuthOptions = {
             return token;
         },
         async redirect({ url, baseUrl }) {
-            // Always redirect to /feed after successful authentication
             const feedUrl = `${baseUrl}/feed`;
-
-            // If there's an error in the URL, redirect to feed anyway
-            if (url.includes("error=") || url.includes("/error")) {
-                return feedUrl;
-            }
-
-            // If URL is relative and is /feed, use it
-            if (url === "/feed" || url.startsWith("/feed")) {
-                return feedUrl;
-            }
-
-            // If URL is same origin and not login/signin/error, use it
+            if (url.includes("error=") || url.includes("/error")) return feedUrl;
+            if (url === "/feed" || url.startsWith("/feed")) return feedUrl;
             if (url.startsWith(baseUrl)) {
-                if (url.includes("/login") || url.includes("/api/auth") || url.includes("/error")) {
-                    return feedUrl;
-                }
+                if (url.includes("/login") || url.includes("/api/auth") || url.includes("/error")) return feedUrl;
                 return url;
             }
-
-            // For any other case, redirect to feed
             return feedUrl;
         },
         async signIn({ user, account, profile }) {
-            // Auto-create username for OAuth users
             if (account?.provider === "google" && user?.email) {
                 try {
                     const { getCollection } = await import("./mongodb");
-
-                    // Try to use new collection helpers, fallback to direct collection access
                     let getUsersCollection: any;
                     let createAccount: any;
                     let findAccountByProvider: any;
@@ -200,8 +225,6 @@ export const authOptions: AuthOptions = {
                         createAccount = dbCollections.createAccount;
                         findAccountByProvider = dbCollections.findAccountByProvider;
                     } catch (e) {
-                        // Fallback: use direct collection access
-                        console.warn("db-collections not available, using fallback");
                         getUsersCollection = () => getCollection("users");
                         createAccount = async (data: any) => {
                             const accountsCollection = await getCollection("accounts");
@@ -219,55 +242,44 @@ export const authOptions: AuthOptions = {
                     }
 
                     const usersCollection = await getUsersCollection();
-
-                    // Check if user exists
                     const existingUser = await usersCollection.findOne({ email: user.email });
 
                     let userId: string;
 
-                    if (existingUser && !existingUser.username) {
+                    if (existingUser) {
                         userId = existingUser._id.toString();
 
-                        // Generate username from name or email
-                        const baseUsername = user.name
-                            ? user.name.toLowerCase().replace(/\s+/g, '')
-                            : user.email.split('@')[0];
+                        // Update existing user with OAuth ID and username if missing
+                        const updateData: any = { updatedAt: new Date() };
+                        if (!existingUser.id) updateData.id = user.id; // Store Google ID
 
-                        let username = baseUsername;
-                        let counter = 1;
-
-                        // Find unique username
-                        while (await usersCollection.findOne({ username })) {
-                            username = `${baseUsername}${counter}`;
-                            counter++;
+                        if (!existingUser.username) {
+                            const baseUsername = user.name ? user.name.toLowerCase().replace(/\s+/g, '') : user.email.split('@')[0];
+                            let username = baseUsername;
+                            let counter = 1;
+                            while (await usersCollection.findOne({ username })) {
+                                username = `${baseUsername}${counter}`;
+                                counter++;
+                            }
+                            updateData.username = username;
                         }
 
-                        // Update user with username
                         await usersCollection.updateOne(
                             { email: user.email },
-                            {
-                                $set: {
-                                    username,
-                                    updatedAt: new Date()
-                                }
-                            }
+                            { $set: updateData }
                         );
-                    } else if (!existingUser) {
-                        // Create new user with username
-                        const baseUsername = user.name
-                            ? user.name.toLowerCase().replace(/\s+/g, '')
-                            : user.email.split('@')[0];
-
+                    } else {
+                        // Create new user with username AND Google ID
+                        const baseUsername = user.name ? user.name.toLowerCase().replace(/\s+/g, '') : user.email.split('@')[0];
                         let username = baseUsername;
                         let counter = 1;
-
-                        // Find unique username
                         while (await usersCollection.findOne({ username })) {
                             username = `${baseUsername}${counter}`;
                             counter++;
                         }
 
                         const result = await usersCollection.insertOne({
+                            id: user.id, // Store Google ID
                             email: user.email,
                             name: user.name,
                             username,
@@ -278,18 +290,11 @@ export const authOptions: AuthOptions = {
                         });
 
                         userId = result.insertedId.toString();
-                    } else {
-                        userId = existingUser._id.toString();
                     }
 
-                    // Store OAuth account in separate accounts collection (optional - won't break if fails)
                     if (account && userId) {
                         try {
-                            const existingAccount = await findAccountByProvider(
-                                account.provider,
-                                account.providerAccountId
-                            );
-
+                            const existingAccount = await findAccountByProvider(account.provider, account.providerAccountId);
                             if (!existingAccount) {
                                 await createAccount({
                                     userId,
@@ -303,40 +308,15 @@ export const authOptions: AuthOptions = {
                                     id_token: account.id_token,
                                     session_state: account.session_state,
                                 });
-                            } else {
-                                // Update existing account
-                                try {
-                                    const accountsCollection = await getCollection("accounts");
-                                    await accountsCollection.updateOne(
-                                        { _id: existingAccount._id },
-                                        {
-                                            $set: {
-                                                access_token: account.access_token,
-                                                expires_at: account.expires_at,
-                                                token_type: account.token_type,
-                                                scope: account.scope,
-                                                id_token: account.id_token,
-                                                session_state: account.session_state,
-                                                updatedAt: new Date(),
-                                            }
-                                        }
-                                    );
-                                } catch (updateError) {
-                                    console.warn("Could not update account:", updateError);
-                                    // Continue - account update is optional
-                                }
                             }
                         } catch (accountError) {
-                            // Account creation is optional - don't break auth flow
-                            console.warn("Could not create/update account in accounts collection:", accountError);
-                            // Auth will still work - user is created in users collection
+                            console.warn("Could not handle account entry:", accountError);
                         }
                     }
                 } catch (error) {
-                    console.error("Error creating username for OAuth user:", error);
+                    console.error("Error in signIn callback:", error);
                 }
             }
-
             return true;
         },
     },
@@ -345,6 +325,5 @@ export const authOptions: AuthOptions = {
         error: "/error",
     },
     secret: process.env.NEXTAUTH_SECRET || "dev-secret-change-in-production-min-32-chars-long",
-    // Only enable debug if explicitly set in env, otherwise disable to avoid warnings
     debug: process.env.NEXTAUTH_DEBUG === "true",
 };

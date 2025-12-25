@@ -112,8 +112,16 @@ function LoginContent() {
     setIsLoading(true);
     setError(null);
     try {
+      // Get or create guestDeviceId from localStorage for persistence on same device
+      let deviceId = typeof window !== 'undefined' ? localStorage.getItem("guestDeviceId") : null;
+      if (!deviceId && typeof window !== 'undefined') {
+        deviceId = `dev_${Math.random().toString(36).substring(2, 15)}_${Date.now()}`;
+        localStorage.setItem("guestDeviceId", deviceId);
+      }
+
       const result = await signIn("credentials", {
         guest: "true",
+        deviceId: deviceId || "",
         redirect: false,
         callbackUrl: "/feed"
       });
