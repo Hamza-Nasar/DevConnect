@@ -701,6 +701,12 @@ export default function ChatPage() {
           );
 
           if (socket) {
+            console.log("📤 [Client] Emitting send_message:", {
+              messageId: data.message.id,
+              senderId: data.message.senderId,
+              receiverId: selectedChat.userId,
+              socketConnected: socket.connected
+            });
             socket.emit("send_message", {
               message: data.message,
               receiverId: selectedChat.userId,

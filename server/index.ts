@@ -59,9 +59,13 @@ export function initializeSocket(server: HTTPServer) {
     const rooms = new Set<string>();
     rooms.add(`user:${userId}`);
 
+    console.log(`🔎 [Server] getUserRooms called for: ${userId}`);
+
     try {
       const usersCollection = await getCollection(COLLECTIONS.USERS);
       const userIdObj = toObjectId(userId);
+
+      console.log(`🔎 [Server] Converted to ObjectId: ${userIdObj ? 'yes' : 'no (using string lookup)'}`);
 
       const user = userIdObj
         ? await usersCollection.findOne({ _id: userIdObj })
@@ -72,11 +76,15 @@ export function initializeSocket(server: HTTPServer) {
         const oauthId = user.id;
         rooms.add(`user:${dbId}`);
         if (oauthId) rooms.add(`user:${oauthId}`);
+        console.log(`✅ [Server] getUserRooms found user: DB=${dbId}, OAuth=${oauthId}`);
+      } else {
+        console.log(`⚠️ [Server] getUserRooms: User NOT found in DB for ${userId}`);
       }
     } catch (error) {
-      console.error(`⚠️ [Server] getUserRooms error for ${userId}:`, error);
+      console.error(`❌ [Server] getUserRooms error for ${userId}:`, error);
     }
 
+    console.log(`📋 [Server] getUserRooms returning ${rooms.size} rooms: ${Array.from(rooms).join(", ")}`);
     return Array.from(rooms);
   };
 
