@@ -1,48 +1,184 @@
-DEVCONNECT PROPRIETARY LICENSE
-Version 1.0 – December 2025
-Copyright (c) 2025 Hamza Nasar. All rights reserved.
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>DevConnect Proprietary License</title>
 
-1. Ownership
----------------
-This software, including all source code, documentation, designs, assets, and associated intellectual property (collectively referred to as "DevConnect"), is the exclusive property of Hamza Nasar. All rights are reserved. No part of DevConnect may be used, copied, modified, distributed, or otherwise exploited except as explicitly authorized by the copyright holder in writing.
+  <!-- Font Awesome Icons -->
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+  />
 
-2. License Grant
-----------------
-DevConnect is provided for **viewing, evaluation, and portfolio purposes only**. No rights are granted for commercial use, redistribution, or derivative works unless explicitly approved in writing by Hamza Nasar.
+  <style>
+    body {
+      margin: 0;
+      font-family: "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, #0b0b0b, #000);
+      color: #e6e6e6;
+      line-height: 1.7;
+    }
 
-3. Prohibited Uses
------------------
-Without prior written consent from Hamza Nasar, the following actions are strictly prohibited:
+    .container {
+      max-width: 900px;
+      margin: 50px auto;
+      padding: 40px;
+      border-radius: 14px;
+      background: rgba(15, 15, 15, 0.95);
+      box-shadow: 0 0 40px rgba(255, 0, 0, 0.15);
+      animation: fadeIn 1s ease-in-out;
+    }
 
-- Copying, reproducing, or duplicating DevConnect in whole or in part.  
-- Using DevConnect as a template, base, or reference for other projects.  
-- Creating derivative works or adaptations based on DevConnect.  
-- Distributing, sublicensing, selling, or offering DevConnect or its components to any third party.  
-- Deploying DevConnect in any live or production environment.  
-- Reverse-engineering, decompiling, or attempting to extract the source code or architecture.  
+    h1 {
+      text-align: center;
+      color: #ff3b3b;
+      letter-spacing: 2px;
+      margin-bottom: 10px;
+    }
 
-4. Portfolio and Educational Use
--------------------------------
-- Students, developers, or reviewers may **view** and **analyze** DevConnect for educational or portfolio purposes.  
-- Any code snippets, screenshots, or architectural explanations used in educational content must include clear attribution to Hamza Nasar.  
-- Evaluation is limited to personal learning or private portfolio demonstration only.
+    .subtitle {
+      text-align: center;
+      font-size: 14px;
+      color: #aaa;
+      margin-bottom: 30px;
+    }
 
-5. No Warranty
----------------
-DevConnect is provided "as is" without any warranties, express or implied, including but not limited to warranties of merchantability, fitness for a particular purpose, or non-infringement. The copyright holder shall not be liable for any damages arising from the use or inability to use the software.
+    .warning {
+      background: linear-gradient(90deg, #3b0000, #1a0000);
+      border-left: 6px solid #ff0000;
+      padding: 16px 20px;
+      margin-bottom: 30px;
+      border-radius: 8px;
+      color: #ffb3b3;
+      animation: pulse 2s infinite;
+    }
 
-6. Enforcement
----------------
-Violation of this license may result in **legal action**. The copyright holder reserves all rights to enforce intellectual property claims, including seeking monetary damages and injunctive relief.
+    .section {
+      margin-bottom: 28px;
+    }
 
-7. Governing Law
-----------------
-This license shall be governed by and construed in accordance with the laws of Pakistan, without regard to conflict of laws principles.
+    .section h2 {
+      font-size: 20px;
+      color: #ff5c5c;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
 
-8. Contact
-----------
-Requests for explicit written permission or licensing inquiries should be directed to:
+    .section p,
+    .section li {
+      color: #d4d4d4;
+      font-size: 15px;
+    }
 
-**Hamza Nasar**  
-Email: hamzanasar144@gmail.com  
-Portfolio: [https://hamza-dev-blond.vercel.app/](https://hamza-dev-blond.vercel.app/)
+    ul {
+      padding-left: 22px;
+    }
+
+    li {
+      margin-bottom: 8px;
+    }
+
+    .footer {
+      border-top: 1px solid #333;
+      padding-top: 20px;
+      margin-top: 40px;
+      text-align: center;
+      font-size: 14px;
+      color: #999;
+    }
+
+    a {
+      color: #ff3b3b;
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 10px rgba(255,0,0,0.2); }
+      50% { box-shadow: 0 0 25px rgba(255,0,0,0.6); }
+      100% { box-shadow: 0 0 10px rgba(255,0,0,0.2); }
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1><i class="fa-solid fa-skull-crossbones"></i> DEVCONNECT</h1>
+    <div class="subtitle">
+      Proprietary License • Version 1.0 • December 2025
+    </div>
+
+    <div class="warning">
+      <i class="fa-solid fa-triangle-exclamation"></i>
+      <strong> WARNING:</strong> Unauthorized copying, usage, or distribution of
+      this software is strictly prohibited and may result in severe legal action.
+    </div>
+
+    <div class="section">
+      <h2><i class="fa-solid fa-lock"></i> Ownership</h2>
+      <p>
+        DevConnect, including all source code, designs, documentation, and
+        intellectual property, is the exclusive property of
+        <strong>Hamza Nasar</strong>. All rights are fully reserved.
+      </p>
+    </div>
+
+    <div class="section">
+      <h2><i class="fa-solid fa-file-shield"></i> License Grant</h2>
+      <p>
+        This software is provided strictly for viewing, evaluation, and personal
+        portfolio purposes. No commercial or production usage is permitted.
+      </p>
+    </div>
+
+    <div class="section">
+      <h2><i class="fa-solid fa-ban"></i> Prohibited Actions</h2>
+      <ul>
+        <li>Copying or cloning any part of the project</li>
+        <li>Using DevConnect as a base or template</li>
+        <li>Creating derivative or competing products</li>
+        <li>Deploying in production or live environments</li>
+        <li>Reverse engineering or extracting architecture</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2><i class="fa-solid fa-gavel"></i> Enforcement</h2>
+      <p>
+        Any violation of this license will result in aggressive legal enforcement,
+        including claims for damages and injunctive relief.
+      </p>
+    </div>
+
+    <div class="section">
+      <h2><i class="fa-solid fa-scale-balanced"></i> Governing Law</h2>
+      <p>
+        This license is governed by the laws of Pakistan. All disputes fall under
+        Pakistani jurisdiction.
+      </p>
+    </div>
+
+    <div class="footer">
+      © 2025 <strong>Hamza Nasar</strong><br />
+      📧 <a href="mailto:hamzanasar144@gmail.com">hamzanasar144@gmail.com</a><br />
+      🌐 <a href="https://hamza-dev-blond.vercel.app/" target="_blank">Portfolio</a>
+    </div>
+  </div>
+</body>
+</html>
