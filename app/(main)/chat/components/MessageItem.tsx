@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Smile,
@@ -10,7 +10,8 @@ import {
     CheckCheck,
     FileText,
     Edit2,
-    Trash2
+    Trash2,
+    X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import RealTimeAvatar from "@/components/avatar/RealTimeAvatar";
@@ -47,15 +48,36 @@ export default function MessageItem({
     formatContent
 }: MessageItemProps) {
     const [showReactions, setShowReactions] = useState(false);
+    const [isLongPressed, setIsLongPressed] = useState(false);
+    const longPressTimer = useRef<NodeJS.Timeout | null>(null);
+
+    const handleTouchStart = () => {
+        longPressTimer.current = setTimeout(() => {
+            setIsLongPressed(true);
+            // Vibrate if supported
+            if (navigator.vibrate) navigator.vibrate(50);
+        }, 500);
+    };
+
+    const handleTouchEnd = () => {
+        if (longPressTimer.current) clearTimeout(longPressTimer.current);
+    };
 
     return (
         <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9 }}
-            className={`group flex ${isOwn ? "justify-end" : "justify-start"} mb-2 px-4`}
+            className={`group flex ${isOwn ? "justify-end" : "justify-start"} mb-2 px-2 sm:px-4 relative`}
         >
-            <div className={`flex items-end gap-2 max-w-[85%] ${isOwn ? "flex-row-reverse" : "flex-row"}`}>
+            <div
+                className={`flex items-end gap-2 max-w-[90%] sm:max-w-[85%] lg:max-w-[75%] ${isOwn ? "flex-row-reverse" : "flex-row"}`}
+                onTouchStart={handleTouchStart}
+                onTouchEnd={handleTouchEnd}
+                onMouseDown={handleTouchStart}
+                onMouseUp={handleTouchEnd}
+                onMouseLeave={handleTouchEnd}
+            >
                 {showAvatar && !isOwn && (
                     <RealTimeAvatar
                         userId={message.sender?.id}
@@ -70,7 +92,7 @@ export default function MessageItem({
                 <div className="flex flex-col gap-1 relative">
                     {/* Reaction Overlay (Quick Select) */}
                     <AnimatePresence>
-                        {showReactions && (
+                        {(showReactions || isLongPressed) && (
                             <motion.div
                                 initial={{ opacity: 0, y: 10, scale: 0.9 }}
                                 animate={{ opacity: 1, y: -45, scale: 1 }}
@@ -83,12 +105,21 @@ export default function MessageItem({
                                         onClick={() => {
                                             onReaction(emoji);
                                             setShowReactions(false);
+                                            setIsLongPressed(false);
                                         }}
                                         className="hover:bg-gray-700 p-1.5 rounded-full transition text-lg leading-none"
                                     >
                                         {emoji}
                                     </button>
                                 ))}
+                                {isLongPressed && (
+                                    <button
+                                        onClick={() => setIsLongPressed(false)}
+                                        className="p-1.5 text-gray-400 hover:text-white"
+                                    >
+                                        <X className="h-4 w-4" />
+                                    </button>
+                                )}
                             </motion.div>
                         )}
                     </AnimatePresence>
@@ -126,7 +157,7 @@ export default function MessageItem({
                         className={`relative rounded-2xl px-4 py-2.5 transition-all ${isOwn
                             ? "bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-br-none shadow-blue-900/10"
                             : "bg-gray-800 text-gray-100 rounded-bl-none border border-gray-700"
-                            }`}
+                            } ${isLongPressed ? "ring-2 ring-purple-500 scale-[0.98]" : ""}`}
                     >
                         {message.type === "text" && (
                             <div className="text-sm prose prose-invert max-w-none">
@@ -150,12 +181,12 @@ export default function MessageItem({
                             {message.edits && message.edits.length > 0 && <span>(edited)</span>}
                         </div>
 
-                        {/* Actions Menu Trigger */}
-                        <div className={`absolute top-1/2 -translate-y-1/2 ${isOwn ? "-left-12" : "-right-12"} opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1`}>
+                        {/* Actions Menu Trigger - Desktop (Hover) & Mobile (Long Press Indicator) */}
+                        <div className={`absolute top-1/2 -translate-y-1/2 ${isOwn ? "right-full mr-2" : "left-full ml-2"} flex items-center gap-1 ${isLongPressed ? "opacity-100" : "opacity-0 group-hover:opacity-100"} transition-opacity`}>
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 rounded-full"
+                                className="h-8 w-8 rounded-full hover:bg-white/10"
                                 onClick={() => setShowReactions(!showReactions)}
                             >
                                 <Smile className="h-4 w-4" />
@@ -163,14 +194,14 @@ export default function MessageItem({
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 rounded-full"
+                                className="h-8 w-8 rounded-full hover:bg-white/10"
                                 onClick={onReply}
                             >
                                 <Reply className="h-4 w-4" />
                             </Button>
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-white/10">
                                         <MoreHorizontal className="h-4 w-4" />
                                     </Button>
                                 </DropdownMenuTrigger>

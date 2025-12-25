@@ -433,7 +433,7 @@ export default function ChatPage() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, typingUsers]);
 
   /* Global Search State */
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -1053,10 +1053,18 @@ export default function ChatPage() {
     }
   };
 
-  const scrollToBottom = () => {
-    setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, 100);
+  const scrollToBottom = (instant = false) => {
+    if (typeof window === 'undefined') return;
+
+    // Using requestAnimationFrame for smoother timing without fixed timeouts
+    requestAnimationFrame(() => {
+      if (messagesEndRef.current) {
+        messagesEndRef.current.scrollIntoView({
+          behavior: instant ? "auto" : "smooth",
+          block: "end"
+        });
+      }
+    });
   };
 
   if (status === "loading") {
@@ -1317,7 +1325,10 @@ export default function ChatPage() {
                   </div>
 
                   {/* Messages - Enhanced */}
-                  <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 lg:p-6 space-y-3 sm:space-y-4 bg-background/50 custom-scrollbar">
+                  <div
+                    className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 lg:p-6 space-y-3 sm:space-y-4 bg-background/50 custom-scrollbar overscroll-contain"
+                    style={{ overflowAnchor: 'auto' }}
+                  >
                     <AnimatePresence>
                       {messages.map((message, index) => {
                         const isOwn = message.senderId === session?.user?.id;
