@@ -14,12 +14,12 @@ export function initializeSocket(server: HTTPServer) {
   // Get allowed origins from environment or use default
   const getAllowedOrigins = (): string[] | boolean => {
     const allowedOrigins = process.env.ALLOWED_ORIGINS;
-    
+
     if (allowedOrigins) {
       // Split by comma and trim
       return allowedOrigins.split(',').map(origin => origin.trim());
     }
-    
+
     // In production, allow common origins
     if (process.env.NODE_ENV === 'production') {
       return [
@@ -28,7 +28,7 @@ export function initializeSocket(server: HTTPServer) {
         process.env.FRONTEND_URL || '',
       ].filter(Boolean);
     }
-    
+
     // In development, allow all origins
     return true;
   };
@@ -53,6 +53,32 @@ export function initializeSocket(server: HTTPServer) {
 
   // Store user socket connections: userId -> Set of socketIds
   const userSockets = new Map<string, Set<string>>();
+
+  // Helper: resolve a userId to all possible room names (handles ID mismatch between OAuth/DB)
+  const getUserRooms = async (userId: string): Promise<string[]> => {
+    const rooms = new Set<string>();
+    rooms.add(`user:${userId}`);
+
+    try {
+      const usersCollection = await getCollection(COLLECTIONS.USERS);
+      const userIdObj = toObjectId(userId);
+
+      const user = userIdObj
+        ? await usersCollection.findOne({ _id: userIdObj })
+        : await usersCollection.findOne({ id: userId });
+
+      if (user) {
+        const dbId = user._id.toString();
+        const oauthId = user.id;
+        rooms.add(`user:${dbId}`);
+        if (oauthId) rooms.add(`user:${oauthId}`);
+      }
+    } catch (error) {
+      console.error(`⚠️ [Server] getUserRooms error for ${userId}:`, error);
+    }
+
+    return Array.from(rooms);
+  };
 
   console.log("🚀 Socket.IO Server Initialized");
 
@@ -153,22 +179,13 @@ export function initializeSocket(server: HTTPServer) {
     });
 
     // Video/Voice Call Signaling - UPDATED for avatar/video type
-    socket.on("call_user", (data: { userToCall: string; signalData: unknown; from: string; name: string; avatar: string; isVideo: boolean }) => {
-      const receiverRoom = `user:${data.userToCall}`;
-      const roomClients = io.sockets.adapter.rooms.get(receiverRoom);
-      const clientCount = roomClients ? roomClients.size : 0;
+    socket.on("call_user", async (data: { userToCall: string; signalData: unknown; from: string; name: string; avatar: string; isVideo: boolean }) => {
+      console.log(`📞 [Server] Call: ${data.from} → ${data.userToCall}`);
 
-      console.log(`📞 [Server] Call: ${data.from} → ${data.userToCall} (Room: ${receiverRoom}, Clients: ${clientCount})`);
+      // Resolve receiver to all room variants for cross-auth call delivery
+      const receiverRooms = await getUserRooms(data.userToCall);
+      console.log(`📞 [Server] Resolved receiver rooms: ${receiverRooms.join(", ")}`);
 
-      if (clientCount === 0) {
-        console.warn(`⚠️ [Server] Receiver room "${receiverRoom}" is empty! Call won't be delivered.`);
-        // Try alternative room format
-        const altRoom = `user:${data.userToCall}`;
-        const altClients = io.sockets.adapter.rooms.get(altRoom);
-        console.log(`🔄 [Server] Trying alternative room format, clients: ${altClients?.size || 0}`);
-      }
-
-      // Emit to receiver room
       const callData = {
         signal: data.signalData,
         from: data.from,
@@ -177,30 +194,28 @@ export function initializeSocket(server: HTTPServer) {
         isVideo: data.isVideo
       };
 
-      console.log(`📤 [Server] Emitting call_user event to room: ${receiverRoom}`, callData);
-      io.to(receiverRoom).emit("call_user", callData);
+      // Emit to all receiver rooms
+      receiverRooms.forEach(room => {
+        io.to(room).emit("call_user", callData);
+      });
 
-      if (roomClients) {
-        roomClients.forEach((socketId) => {
-          const targetSocket = io.sockets.sockets.get(socketId) as CustomSocket;
-          if (targetSocket) {
-            console.log(`📤 [Server] Emitting to socket: ${socketId}, userId: ${targetSocket.userId}`);
-            targetSocket.emit("call_user", callData);
-          }
-        });
-      }
-
-      console.log(`✅ [Server] Call event emitted to room: ${receiverRoom}`);
+      console.log(`✅ [Server] Call event emitted to ${receiverRooms.length} rooms`);
     });
 
-    socket.on("answer_call", (data: { to: string; signal: unknown }) => {
+    socket.on("answer_call", async (data: { to: string; signal: unknown }) => {
       console.log(`✅ Call answered, signal sent to ${data.to}`);
-      io.to(`user:${data.to}`).emit("call_accepted", data.signal);
+      const receiverRooms = await getUserRooms(data.to);
+      receiverRooms.forEach(room => {
+        io.to(room).emit("call_accepted", data.signal);
+      });
     });
 
-    socket.on("end_call", (data: { to: string }) => {
+    socket.on("end_call", async (data: { to: string }) => {
       console.log(`📴 Call ended with ${data.to}`);
-      io.to(`user:${data.to}`).emit("call_ended");
+      const receiverRooms = await getUserRooms(data.to);
+      receiverRooms.forEach(room => {
+        io.to(room).emit("call_ended");
+      });
     });
 
     // Join post room for real-time updates
@@ -620,74 +635,98 @@ export function initializeSocket(server: HTTPServer) {
     });
 
     // Handle new message (Direct Message)
-    socket.on("send_message", (data: { message: { id?: string; senderId: string }; receiverId: string }) => {
+    socket.on("send_message", async (data: { message: { id?: string; senderId: string }; receiverId: string }) => {
       console.log(`💬 [Server] Message: ${data.message.senderId} → ${data.receiverId}`);
 
-      // Emit to receiver
-      io.to(`user:${data.receiverId}`).emit("new_message", data.message);
+      // Resolve both IDs to all room variants for cross-auth delivery
+      const [receiverRooms, senderRooms] = await Promise.all([
+        getUserRooms(data.receiverId),
+        getUserRooms(data.message.senderId)
+      ]);
 
-      // Emit to sender (for other tabs)
-      io.to(`user:${data.message.senderId}`).emit("new_message", data.message);
+      console.log(`📡 [Server] Emitting to receiver rooms: ${receiverRooms.join(", ")}`);
+      console.log(`📡 [Server] Emitting to sender rooms: ${senderRooms.join(", ")}`);
+
+      // Emit to all receiver rooms
+      receiverRooms.forEach(room => {
+        io.to(room).emit("new_message", data.message);
+      });
+
+      // Emit to all sender rooms (for other tabs)
+      senderRooms.forEach(room => {
+        io.to(room).emit("new_message", data.message);
+      });
 
       // Send delivery confirmation to sender if message has an ID
       if (data.message.id) {
-        io.to(`user:${data.message.senderId}`).emit("message_delivered", {
-          messageId: data.message.id,
-          userId: data.receiverId,
-          deliveredAt: new Date()
+        senderRooms.forEach(room => {
+          io.to(room).emit("message_delivered", {
+            messageId: data.message.id,
+            userId: data.receiverId,
+            deliveredAt: new Date()
+          });
         });
       }
 
-      console.log(`✅ [Server] Message delivered to receiver: user:${data.receiverId} and sender: user:${data.message.senderId}`);
+      console.log(`✅ [Server] Message delivered to ${receiverRooms.length} receiver rooms and ${senderRooms.length} sender rooms`);
     });
 
     // Handle message seen/read
-    socket.on("message_read", (data: { messageId: string; userId: string; senderId: string }) => {
+    socket.on("message_read", async (data: { messageId: string; userId: string; senderId: string }) => {
       console.log(`👀 [Server] Message Read: ${data.messageId} by ${data.userId} (Sender: ${data.senderId})`);
-      // Notify the original sender
-      io.to(`user:${data.senderId}`).emit("message_read", {
-        messageId: data.messageId,
-        userId: data.userId
+      // Notify the original sender via all their rooms
+      const senderRooms = await getUserRooms(data.senderId);
+      senderRooms.forEach(room => {
+        io.to(room).emit("message_read", {
+          messageId: data.messageId,
+          userId: data.userId
+        });
       });
     });
 
     // Handle message reaction
-    socket.on("message_reaction", (data: { messageId: string; userId: string; receiverId: string; reactions: any[] }) => {
+    socket.on("message_reaction", async (data: { messageId: string; userId: string; receiverId: string; reactions: any[] }) => {
       console.log(`❤️ [Server] Reaction: ${data.messageId} from ${data.userId}`);
-      // Notify receiver
-      io.to(`user:${data.receiverId}`).emit("message_reaction", data);
-      // Notify sender (for multi-tab sync)
-      io.to(`user:${data.userId}`).emit("message_reaction", data);
+      const [receiverRooms, senderRooms] = await Promise.all([getUserRooms(data.receiverId), getUserRooms(data.userId)]);
+      receiverRooms.forEach(room => io.to(room).emit("message_reaction", data));
+      senderRooms.forEach(room => io.to(room).emit("message_reaction", data));
     });
 
     // Handle message edit
-    socket.on("message_edited", (data: { messageId: string; userId: string; receiverId: string; content: string; edits: any[] }) => {
+    socket.on("message_edited", async (data: { messageId: string; userId: string; receiverId: string; content: string; edits: any[] }) => {
       console.log(`✍️ [Server] Message Edited: ${data.messageId}`);
-      io.to(`user:${data.receiverId}`).emit("message_edited", data);
-      io.to(`user:${data.userId}`).emit("message_edited", data);
+      const [receiverRooms, senderRooms] = await Promise.all([getUserRooms(data.receiverId), getUserRooms(data.userId)]);
+      receiverRooms.forEach(room => io.to(room).emit("message_edited", data));
+      senderRooms.forEach(room => io.to(room).emit("message_edited", data));
     });
 
     // Handle message deletion
-    socket.on("message_deleted", (data: { messageId: string; userId: string; receiverId: string }) => {
+    socket.on("message_deleted", async (data: { messageId: string; userId: string; receiverId: string }) => {
       console.log(`🗑️ [Server] Message Deleted: ${data.messageId}`);
-      io.to(`user:${data.receiverId}`).emit("message_deleted", data);
-      io.to(`user:${data.userId}`).emit("message_deleted", data);
+      const [receiverRooms, senderRooms] = await Promise.all([getUserRooms(data.receiverId), getUserRooms(data.userId)]);
+      receiverRooms.forEach(room => io.to(room).emit("message_deleted", data));
+      senderRooms.forEach(room => io.to(room).emit("message_deleted", data));
     });
 
-    socket.on("typing", (data: { userId: string; isTyping: boolean }) => {
+    socket.on("typing", async (data: { userId: string; isTyping: boolean }) => {
       const senderId = socket.userId;
       if (senderId) {
-        // Notify receiver
-        io.to(`user:${data.userId}`).emit("typing", {
-          userId: senderId,
-          isTyping: data.isTyping
+        // Resolve receiver to all rooms for cross-auth typing indicators
+        const receiverRooms = await getUserRooms(data.userId);
+
+        // Notify receiver via all their rooms
+        receiverRooms.forEach(room => {
+          io.to(room).emit("typing", {
+            userId: senderId,
+            isTyping: data.isTyping
+          });
         });
 
         // Notify other tabs of same user
         socket.to(`user:${senderId}`).emit("typing", {
-          userId: senderId, // This allows the user to know THEY are typing elsewhere
+          userId: senderId,
           isTyping: data.isTyping,
-          receiverId: data.userId // Context on WHICH chat they are typing in
+          receiverId: data.userId
         });
 
         console.log(`⌨️ Typing indicator: ${senderId} → ${data.userId} (${data.isTyping})`);
