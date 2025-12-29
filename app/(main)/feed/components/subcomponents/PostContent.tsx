@@ -3,12 +3,10 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import PollComponent from "@/components/post/PollComponent";
 
 interface PostContentProps {
     post: any;
-    postSummary: string | null;
     selectedPollOption: string | null;
     pollVotes: any[];
     totalPollVotes: number;
@@ -21,7 +19,6 @@ interface PostContentProps {
 
 export default function PostContent({
     post,
-    postSummary,
     selectedPollOption,
     pollVotes,
     totalPollVotes,
@@ -35,17 +32,6 @@ export default function PostContent({
         <div className="space-y-4">
             {/* Title */}
             {post.title && <h3 className="text-xl font-bold text-white mb-2">{post.title}</h3>}
-
-            {/* AI Summary */}
-            {postSummary && (
-                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="p-4 bg-purple-500/10 border border-purple-500/30 rounded-xl">
-                    <div className="flex items-center gap-2 mb-2">
-                        <Zap className="h-4 w-4 text-purple-400" />
-                        <span className="text-xs font-bold text-purple-400 uppercase">AI Summary</span>
-                    </div>
-                    <p className="text-gray-300 text-sm leading-relaxed">{postSummary}</p>
-                </motion.div>
-            )}
 
             {/* Code Snippet */}
             {post.codeSnippet && (

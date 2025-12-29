@@ -178,21 +178,21 @@ export default function NotificationsPage() {
     return (
         <div className="min-h-screen bg-[#0a0a0a]">
             <Navbar />
-            <div className="pt-20 lg:pl-72 xl:pl-80 pb-10">
-                <div className="max-w-4xl mx-auto px-4 sm:px-6">
-                    {/* Header */}
-                    <div className="flex items-center justify-between mb-8">
+            <div className="pt-16 sm:pt-20 lg:pl-72 xl:pl-80 pb-20 lg:pb-10">
+                <div className="max-w-4xl mx-auto px-3 sm:px-6">
+                    {/* Header - Mobile Optimized */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 sm:mb-8">
                         <div>
-                            <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-                                <Bell className="h-8 w-8 text-purple-500" />
+                            <h1 className="text-2xl sm:text-3xl font-bold text-white flex items-center gap-2 sm:gap-3">
+                                <Bell className="h-6 w-6 sm:h-8 sm:w-8 text-purple-500" />
                                 Notifications
                                 {notifications.filter(n => !n.read).length > 0 && (
-                                    <Badge variant="danger" className="ml-2 px-2 py-0.5 text-sm h-6">
+                                    <Badge variant="danger" className="ml-1 sm:ml-2 px-2 py-0.5 text-xs sm:text-sm h-5 sm:h-6">
                                         {notifications.filter(n => !n.read).length}
                                     </Badge>
                                 )}
                             </h1>
-                            <p className="text-gray-400 mt-1">
+                            <p className="text-sm sm:text-base text-gray-400 mt-1">
                                 Stay updated with your latest interactions
                             </p>
                         </div>
@@ -201,7 +201,7 @@ export default function NotificationsPage() {
                                 variant="ghost"
                                 size="sm"
                                 onClick={markAllAsRead}
-                                className="text-purple-400 hover:text-purple-300 hover:bg-purple-500/10"
+                                className="text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 w-full sm:w-auto justify-center text-sm"
                             >
                                 <CheckCheck className="h-4 w-4 mr-2" />
                                 Mark all as read

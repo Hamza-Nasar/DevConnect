@@ -43,6 +43,7 @@ export const COLLECTIONS = {
   GROUP_POSTS: "groupposts",   // Group posts
   USER_SETTINGS: "usersettings", // User settings
   PROFILE_VIEWS: "profileviews", // Profile views
+  BOOKMARKS: "bookmarks",        // User bookmarks
   METADATA: "devconnect",        // Project metadata - تمام collections کی list
 } as const;
 

@@ -440,28 +440,33 @@ export default function SettingsPage() {
             <p className="text-muted-foreground">Manage your account and preferences</p>
           </div>
 
-          {/* Tabs */}
+          {/* Tabs - Mobile Responsive */}
           <Tabs defaultValue="profile" className="mb-6">
-            <TabsList className="grid w-full grid-cols-5">
-              <TabsTrigger value="profile">
-                <User className="h-4 w-4 mr-2" />
-                Profile
+            <TabsList className="flex w-full overflow-x-auto scrollbar-hide gap-1 p-1 bg-gray-800/30 rounded-xl border border-gray-700/30 mobile-tabs-scroll">
+              <TabsTrigger value="profile" className="flex-shrink-0 flex items-center gap-1.5 px-3 sm:px-4 py-2.5 text-xs sm:text-sm min-w-[80px] sm:min-w-0 whitespace-nowrap">
+                <User className="h-4 w-4 flex-shrink-0" />
+                <span className="hidden sm:inline">Profile</span>
+                <span className="sm:hidden">Profile</span>
               </TabsTrigger>
-              <TabsTrigger value="privacy">
-                <Lock className="h-4 w-4 mr-2" />
-                Privacy
+              <TabsTrigger value="privacy" className="flex-shrink-0 flex items-center gap-1.5 px-3 sm:px-4 py-2.5 text-xs sm:text-sm min-w-[80px] sm:min-w-0 whitespace-nowrap">
+                <Lock className="h-4 w-4 flex-shrink-0" />
+                <span className="hidden sm:inline">Privacy</span>
+                <span className="sm:hidden">Privacy</span>
               </TabsTrigger>
-              <TabsTrigger value="notifications">
-                <Bell className="h-4 w-4 mr-2" />
-                Notifications
+              <TabsTrigger value="notifications" className="flex-shrink-0 flex items-center gap-1.5 px-3 sm:px-4 py-2.5 text-xs sm:text-sm min-w-[80px] sm:min-w-0 whitespace-nowrap">
+                <Bell className="h-4 w-4 flex-shrink-0" />
+                <span className="hidden sm:inline">Notifications</span>
+                <span className="sm:hidden">Alerts</span>
               </TabsTrigger>
-              <TabsTrigger value="security">
-                <Shield className="h-4 w-4 mr-2" />
-                Security
+              <TabsTrigger value="security" className="flex-shrink-0 flex items-center gap-1.5 px-3 sm:px-4 py-2.5 text-xs sm:text-sm min-w-[80px] sm:min-w-0 whitespace-nowrap">
+                <Shield className="h-4 w-4 flex-shrink-0" />
+                <span className="hidden sm:inline">Security</span>
+                <span className="sm:hidden">Security</span>
               </TabsTrigger>
-              <TabsTrigger value="appearance">
-                <Palette className="h-4 w-4 mr-2" />
-                Appearance
+              <TabsTrigger value="appearance" className="flex-shrink-0 flex items-center gap-1.5 px-3 sm:px-4 py-2.5 text-xs sm:text-sm min-w-[80px] sm:min-w-0 whitespace-nowrap">
+                <Palette className="h-4 w-4 flex-shrink-0" />
+                <span className="hidden sm:inline">Appearance</span>
+                <span className="sm:hidden">Theme</span>
               </TabsTrigger>
             </TabsList>
 

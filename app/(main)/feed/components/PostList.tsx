@@ -63,9 +63,18 @@ export default function PostList({ onDelete, filter = "All" }: PostListProps) {
       const newPosts = data.posts || [];
 
       if (append) {
-        setPosts((prev) => [...prev, ...newPosts]);
+        // Filter out duplicates when appending
+        setPosts((prev) => {
+          const existingIds = new Set(prev.map(p => p.id));
+          const uniqueNewPosts = newPosts.filter((p: Post) => !existingIds.has(p.id));
+          return [...prev, ...uniqueNewPosts];
+        });
       } else {
-        setPosts(newPosts);
+        // Remove duplicates from initial load as well
+        const uniquePosts = newPosts.filter((post: Post, index: number, self: Post[]) => 
+          index === self.findIndex((p) => p.id === post.id)
+        );
+        setPosts(uniquePosts);
       }
 
       setHasMore(newPosts.length === 10);
@@ -192,6 +201,11 @@ export default function PostList({ onDelete, filter = "All" }: PostListProps) {
     );
   }
 
+  // Extra safety: deduplicate posts before render
+  const uniquePosts = posts.filter((post, index, self) => 
+    index === self.findIndex((p) => p.id === post.id)
+  );
+
   return (
     <InfiniteScroll
       loadMore={loadMore}
@@ -200,8 +214,8 @@ export default function PostList({ onDelete, filter = "All" }: PostListProps) {
       endMessage={<p className="text-gray-400">No more posts to load</p>}
     >
       <div className="space-y-6">
-        {posts.map((post) => (
-          <PostItem key={post.id} post={post} onDelete={onDelete} />
+        {uniquePosts.map((post, index) => (
+          <PostItem key={`${post.id}-${index}`} post={post} onDelete={onDelete} />
         ))}
       </div>
     </InfiniteScroll>

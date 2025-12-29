@@ -142,7 +142,7 @@ export default function Navbar() {
   ];
 
   const quickActions = [
-    { icon: Plus, label: "Create Post", action: () => router.push("/feed") },
+    { icon: Plus, label: "Create Post", action: () => router.push("/create-post") },
     { icon: Video, label: "Go Live", action: () => router.push("/live") },
     { icon: ImageIcon, label: "Upload Media", action: () => router.push("/create-post") },
     { icon: Code, label: "Code Snippet", action: () => router.push("/code-snippets") },
@@ -183,50 +183,45 @@ export default function Navbar() {
               </div>
             </div>
 
-            {/* Mobile Search Button */}
+            {/* Mobile Search Button - Only on mobile */}
             <Button
               variant="ghost"
               size="icon"
               onClick={() => router.push("/search")}
-              className="md:hidden"
+              className="lg:hidden"
             >
               <Search className="h-5 w-5" />
             </Button>
 
-            {/* Right Side Actions - Enhanced Responsive */}
+            {/* Right Side Actions - Simplified for Mobile (Bottom Nav handles navigation) */}
             <div className="flex items-center space-x-1 sm:space-x-2">
-              {/* Create Post Button - Mobile Icon Only */}
-              <Button
-                variant="primary"
-                size="icon"
-                onClick={() => router.push("/feed")}
-                className="sm:hidden"
-                title="Create Post"
-              >
-                <Plus className="h-5 w-5" />
-              </Button>
+              {/* Desktop Only: Create Post Button */}
               <Button
                 variant="primary"
                 size="sm"
-                onClick={() => router.push("/feed")}
-                className="hidden sm:flex"
+                onClick={() => router.push("/create-post")}
+                className="hidden lg:flex"
               >
                 <Plus className="h-4 w-4 mr-1" />
                 Create
               </Button>
 
-              {/* Theme Toggle */}
-              <ThemeToggle />
+              {/* Desktop Only: Theme Toggle */}
+              <div className="hidden lg:block">
+                <ThemeToggle />
+              </div>
 
-              {/* Notifications */}
-              <NotificationCenter />
+              {/* Desktop Only: Notifications */}
+              <div className="hidden lg:block">
+                <NotificationCenter />
+              </div>
 
-              {/* Messages */}
+              {/* Desktop Only: Messages */}
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => router.push("/chat")}
-                className="relative hidden sm:flex"
+                className="relative hidden lg:flex"
               >
                 <MessageCircle className="h-5 w-5" />
                 {messages > 0 && (
@@ -239,7 +234,7 @@ export default function Navbar() {
                 )}
               </Button>
 
-              {/* User Menu */}
+              {/* User Avatar - Always visible */}
               <div className="relative group">
                 <button
                   onClick={() => {
@@ -262,12 +257,12 @@ export default function Navbar() {
                 </button>
               </div>
 
-              {/* Mobile Menu Toggle */}
+              {/* Desktop Only: Mobile Menu Toggle (hidden on mobile since we have bottom nav) */}
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setShowMobileMenu(!showMobileMenu)}
-                className="md:hidden"
+                className="hidden md:flex lg:hidden"
               >
                 {showMobileMenu ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
               </Button>
@@ -351,14 +346,14 @@ export default function Navbar() {
         </div>
       </aside>
 
-      {/* Mobile Menu */}
+      {/* Tablet Menu (md to lg) - Hidden on mobile phones since bottom nav is there */}
       <AnimatePresence>
         {showMobileMenu && (
           <motion.div
             initial={{ opacity: 0, x: -300 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -300 }}
-            className="fixed inset-y-0 left-0 z-50 w-64 bg-gray-900 border-r border-gray-800 lg:hidden flex flex-col"
+            className="fixed inset-y-0 left-0 z-50 w-64 bg-gray-900 border-r border-gray-800 hidden md:flex lg:hidden flex-col"
           >
             {/* Fixed Header */}
             <div className="p-4 border-b border-gray-800 flex-shrink-0">
@@ -392,7 +387,7 @@ export default function Navbar() {
                 );
               })}
 
-              {/* Quick Actions - Mobile */}
+              {/* Quick Actions - Tablet */}
               <div className="pt-4 border-t border-gray-800 mt-4">
                 <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                   Quick Actions
@@ -415,7 +410,7 @@ export default function Navbar() {
                 })}
               </div>
 
-              {/* Settings & Logout - Mobile */}
+              {/* Settings & Logout - Tablet */}
               <div className="pt-4 border-t border-gray-800 mt-4">
                 <Link
                   href="/settings"
@@ -442,10 +437,10 @@ export default function Navbar() {
         )}
       </AnimatePresence>
 
-      {/* Mobile Menu Overlay */}
+      {/* Tablet Menu Overlay (md to lg only) */}
       {showMobileMenu && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          className="fixed inset-0 bg-black/50 z-40 hidden md:block lg:hidden"
           onClick={() => setShowMobileMenu(false)}
         />
       )}

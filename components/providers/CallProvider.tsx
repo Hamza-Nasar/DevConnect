@@ -56,7 +56,7 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
 
     // Initialize sounds
     useEffect(() => {
-        if (typeof window === "undefined") return;
+        if (typeof window === "undefined" || !window?.document) return;
         const ringtone = new Audio("https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3");
         ringtone.loop = true;
         ringtoneRef.current = ringtone;

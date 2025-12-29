@@ -7,15 +7,16 @@ interface CustomSocket extends Socket {
 let socket: CustomSocket | null = null;
 
 export const getSocket = (): CustomSocket | null => {
-  if (typeof window === "undefined") return null;
+  // Strict check for client-side environment
+  if (typeof window === "undefined" || !window?.location) return null;
 
   if (!socket) {
-    const origin = typeof window !== "undefined" ? window.location.origin.replace(/\/$/, "") : "";
+    const origin = window.location.origin.replace(/\/$/, "");
     let socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || origin;
 
     // In production, if NEXT_PUBLIC_SOCKET_URL is not set and we're on Vercel, this is a critical error
-    const isVercel = typeof window !== "undefined" && window.location?.hostname?.includes("vercel.app");
-    const isRailway = typeof window !== "undefined" && window.location?.hostname?.includes("railway.app");
+    const isVercel = window.location?.hostname?.includes("vercel.app");
+    const isRailway = window.location?.hostname?.includes("railway.app");
     const isProduction = process.env.NODE_ENV === "production";
 
     if (isProduction && isVercel && !process.env.NEXT_PUBLIC_SOCKET_URL) {
@@ -26,7 +27,7 @@ export const getSocket = (): CustomSocket | null => {
 
     // Ensure socketUrl has protocol
     if (socketUrl && !socketUrl.startsWith("http")) {
-      socketUrl = (typeof window !== "undefined" && window.location.protocol === "https:" ? "https://" : "http://") + socketUrl;
+      socketUrl = (window.location.protocol === "https:" ? "https://" : "http://") + socketUrl;
     }
 
     // Remove trailing slash

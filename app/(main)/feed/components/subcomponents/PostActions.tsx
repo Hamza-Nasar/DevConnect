@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Heart, MessageCircle, Share2, Bookmark, Zap, Sparkles } from "lucide-react";
+import { Heart, MessageCircle, Share2, Bookmark, Eye, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatNumber } from "@/lib/utils";
 
@@ -17,10 +17,8 @@ interface PostActionsProps {
     onCommentToggle: () => void;
     onShare: () => void;
     onBookmark: () => void;
-    onSummarize: () => void;
     onExplain?: () => void;
     hasCode: boolean;
-    isSummarizing: boolean;
     isExplaining: boolean;
 }
 
@@ -36,16 +34,14 @@ export default function PostActions({
     onCommentToggle,
     onShare,
     onBookmark,
-    onSummarize,
     onExplain,
     hasCode,
-    isSummarizing,
     isExplaining,
 }: PostActionsProps) {
     return (
         <div className="flex flex-col gap-4 mt-6">
             <div className="flex items-center justify-between py-2 border-y border-gray-800/50">
-                <div className="flex items-center gap-6">
+                <div className="flex items-center gap-4 sm:gap-6">
                     <ActionButton
                         icon={Heart}
                         count={likesCount}
@@ -63,6 +59,11 @@ export default function PostActions({
                         count={sharesCount}
                         onClick={onShare}
                     />
+                    {/* Views - Realtime */}
+                    <div className="flex items-center gap-1.5 text-gray-400">
+                        <Eye className="h-5 w-5" />
+                        <span className="text-sm font-medium">{formatNumber(viewsCount)}</span>
+                    </div>
                 </div>
                 <ActionButton
                     icon={Bookmark}
@@ -73,19 +74,9 @@ export default function PostActions({
                 />
             </div>
 
-            <div className="flex items-center gap-3">
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={onSummarize}
-                    disabled={isSummarizing}
-                    className="bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 border border-purple-500/20 rounded-full px-4"
-                >
-                    <Zap className={`h-4 w-4 mr-2 ${isSummarizing ? "animate-pulse" : ""}`} />
-                    {isSummarizing ? "Summarizing..." : "AI Summary"}
-                </Button>
-
-                {hasCode && onExplain && (
+            {/* Only show Explain Code button if post has code */}
+            {hasCode && onExplain && (
+                <div className="flex items-center gap-3">
                     <Button
                         variant="ghost"
                         size="sm"
@@ -96,13 +87,8 @@ export default function PostActions({
                         <Sparkles className={`h-4 w-4 mr-2 ${isExplaining ? "animate-pulse" : ""}`} />
                         {isExplaining ? "Analyzing..." : "Explain Code"}
                     </Button>
-                )}
-
-                <div className="ml-auto text-xs text-gray-500 font-medium tracking-wide flex items-center gap-1.5 uppercase">
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-500/50 animate-pulse" />
-                    {formatNumber(viewsCount)} Views
                 </div>
-            </div>
+            )}
         </div>
     );
 }

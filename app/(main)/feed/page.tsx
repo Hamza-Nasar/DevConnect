@@ -1,9 +1,12 @@
 "use client";
 
 import { useSession } from "next-auth/react";
+
+// Force dynamic rendering to avoid SSR issues
+export const dynamic = "force-dynamic";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import CreatePost from "./components/CreatePost";
+// CreatePost removed from home - available on /create-post page
 import PostList from "./components/PostList";
 import Navbar from "@/components/navbar/Navbar";
 import StoriesBar from "@/components/stories/StoriesBar";
@@ -107,7 +110,7 @@ export default function FeedPage() {
                 <BackgroundAnimation />
                 <Navbar />
 
-                <div className="relative z-10 pt-16 lg:pl-72 xl:pl-80">
+                <div className="relative z-10 pt-16 lg:pl-72 xl:pl-80 pb-20 lg:pb-0">
                     <div className="max-w-7xl mx-auto px-4 py-6">
                         <main className="max-w-2xl mx-auto">
                             {session && (
@@ -116,13 +119,7 @@ export default function FeedPage() {
                                 </ScrollReveal>
                             )}
 
-                            {session && (
-                                <ScrollReveal delay={0.2}>
-                                    <div className="mb-6"><CreatePost /></div>
-                                </ScrollReveal>
-                            )}
-
-                            <ScrollReveal delay={0.3}>
+                            <ScrollReveal delay={0.2}>
                                 <div className="mb-6">
                                     <div className="bg-gray-800/40 backdrop-blur-xl rounded-2xl p-4 border border-gray-700/50 shadow-2xl">
                                         <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">

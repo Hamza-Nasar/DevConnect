@@ -1565,7 +1565,7 @@ export default function ChatPage() {
                           >
                             <Smile className="h-5 w-5 text-yellow-400" />
                           </Button>
-                          {showEmojiPicker && (
+                          {showEmojiPicker && typeof window !== "undefined" && (
                             <div className="absolute bottom-full right-0 mb-2 z-50">
                               <EmojiPicker
                                 onEmojiClick={(emojiData) => {

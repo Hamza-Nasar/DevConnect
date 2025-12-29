@@ -10,6 +10,7 @@ interface RealTimeAvatarProps extends Omit<AvatarProps, "src" | "status"> {
   src?: string | null;
   status?: "online" | "offline" | "away" | "busy";
   alternativeIds?: string[];
+  showOnlineStatus?: boolean;
 }
 
 export default function RealTimeAvatar({
@@ -17,6 +18,7 @@ export default function RealTimeAvatar({
   src,
   status: initialStatus,
   alternativeIds = [],
+  showOnlineStatus = true,
   ...props
 }: RealTimeAvatarProps) {
   const [avatarSrc, setAvatarSrc] = useState(src);
@@ -92,5 +94,5 @@ export default function RealTimeAvatar({
     };
   }, [userId, JSON.stringify(alternativeIds)]);
 
-  return <Avatar src={avatarSrc || src} status={status} {...props} />;
+  return <Avatar src={avatarSrc || src} status={showOnlineStatus ? status : undefined} {...props} />;
 }

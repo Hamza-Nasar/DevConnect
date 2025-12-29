@@ -295,6 +295,14 @@ export function initializeSocket(server: HTTPServer) {
       socket.leave(`post:${postId}`);
     });
 
+    // Handle post view - broadcast to all users viewing this post
+    socket.on("post_view", (data: { postId: string; viewsCount: number }) => {
+      io.to(`post:${data.postId}`).emit("views_updated", {
+        postId: data.postId,
+        viewsCount: data.viewsCount,
+      });
+    });
+
     // Join conversation room
     socket.on("join_conversation", (conversationId: string) => {
       socket.join(`conversation:${conversationId}`);

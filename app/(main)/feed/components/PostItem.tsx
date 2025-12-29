@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useInView } from "react-intersection-observer";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,15 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
   const [commentsCount, setCommentsCount] = useState(post.commentsCount || 0);
   const [bookmarksCount, setBookmarksCount] = useState(post.bookmarksCount || 0);
   const [viewsCount, setViewsCount] = useState(post.viewsCount || 0);
+  
+  // Track if view has been counted for this session
+  const viewCountedRef = useRef(false);
+  
+  // Intersection observer for view tracking
+  const { ref: viewRef, inView } = useInView({
+    threshold: 0.5,
+    triggerOnce: true,
+  });
 
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<any[]>([]);
@@ -37,8 +47,6 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
   const [isLoadingComments, setIsLoadingComments] = useState(false);
 
   const [isLiking, setIsLiking] = useState(false);
-  const [isSummarizing, setIsSummarizing] = useState(false);
-  const [postSummary, setPostSummary] = useState<string | null>(post.summary || null);
   const [isExplaining, setIsExplaining] = useState(false);
   const [explanation, setExplanation] = useState<string | null>(null);
 
@@ -52,6 +60,38 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
   useEffect(() => {
     if (showComments) fetchComments();
   }, [showComments]);
+
+  // Track view when post is visible
+  useEffect(() => {
+    if (inView && !viewCountedRef.current) {
+      viewCountedRef.current = true;
+      
+      // Increment view count
+      const incrementView = async () => {
+        try {
+          const res = await fetch(`/api/posts/${post.id}/view`, { method: "POST" });
+          if (res.ok) {
+            const data = await res.json();
+            setViewsCount(data.viewsCount);
+            
+            // Emit socket event for realtime updates
+            const socket = getSocket();
+            if (socket) {
+              socket.emit("post_view", { 
+                postId: post.id, 
+                viewsCount: data.viewsCount 
+              });
+            }
+          }
+        } catch (error) {
+          console.error("Error tracking view:", error);
+        }
+      };
+      
+      // Small delay to avoid counting rapid scrolling
+      setTimeout(incrementView, 1000);
+    }
+  }, [inView, post.id]);
 
   // Real-time socket listeners for post updates
   useEffect(() => {
@@ -93,6 +133,13 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
       }
     };
 
+    // Realtime views update
+    const handleViewsUpdate = (data: { postId: string; viewsCount: number }) => {
+      if (data.postId === post.id) {
+        setViewsCount(data.viewsCount);
+      }
+    };
+
     // Join post room
     socket.emit("join_post", post.id);
 
@@ -100,12 +147,14 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
     socket.on("comment_deleted", handleCommentDeleted);
     socket.on("like_updated", handleLikeUpdated);
     socket.on("poll_update", handlePollUpdate);
+    socket.on("views_updated", handleViewsUpdate);
 
     return () => {
       socket.off("comment_added", handleCommentAdded);
       socket.off("comment_deleted", handleCommentDeleted);
       socket.off("like_updated", handleLikeUpdated);
       socket.off("poll_update", handlePollUpdate);
+      socket.off("views_updated", handleViewsUpdate);
       socket.emit("leave_post", post.id);
     };
   }, [post.id, session?.user?.id]);
@@ -152,32 +201,13 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
     setBookmarksCount((prev: number) => newBookmarked ? prev + 1 : prev - 1);
 
     try {
-      const res = await fetch(`/api/posts/${post.id}/bookmark`, { method: "POST" });
+      const method = newBookmarked ? "POST" : "DELETE";
+      const res = await fetch(`/api/posts/${post.id}/bookmark`, { method });
       if (!res.ok) throw new Error();
     } catch (error) {
       setBookmarked(!newBookmarked);
       setBookmarksCount((prev: number) => !newBookmarked ? prev + 1 : prev - 1);
       toast.error("Failed to update bookmark");
-    }
-  };
-
-  const handleSummarize = async () => {
-    if (postSummary) { setPostSummary(null); return; }
-    setIsSummarizing(true);
-    try {
-      const res = await fetch(`/api/ai/summarize`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: post.content }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setPostSummary(data.summary);
-      }
-    } catch (error) {
-      toast.error("AI Summarization failed");
-    } finally {
-      setIsSummarizing(false);
     }
   };
 
@@ -277,7 +307,7 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
   const totalVotes = pollVotes.reduce((acc: number, curr: any) => acc + curr.votes, 0);
 
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} id={`post-${post.id}`}>
+    <motion.div ref={viewRef} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} id={`post-${post.id}`}>
       <Card variant="elevated" className="p-4 sm:p-6 mb-6">
         <PostHeader
           post={post}
@@ -307,7 +337,6 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
         ) : (
           <PostContent
             post={post}
-            postSummary={postSummary}
             selectedPollOption={selectedPollOption}
             pollVotes={pollVotes}
             totalPollVotes={totalVotes}
@@ -331,10 +360,8 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
           onCommentToggle={() => setShowComments(!showComments)}
           onShare={() => toast.success("Link copied to clipboard!")}
           onBookmark={handleBookmark}
-          onSummarize={handleSummarize}
-          onExplain={handleExplainCode} // Added
+          onExplain={handleExplainCode}
           hasCode={!!post.codeSnippet}
-          isSummarizing={isSummarizing}
           isExplaining={isExplaining}
         />
 

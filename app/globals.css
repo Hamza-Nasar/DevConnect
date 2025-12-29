@@ -476,3 +476,137 @@
     background-position: 200% center;
   }
 }
+
+/* Safe Area Padding for iOS notch/home indicator */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* Mobile Bottom Nav Spacer */
+.mb-nav-spacer {
+  margin-bottom: 5rem;
+}
+
+@media (min-width: 1024px) {
+  .mb-nav-spacer {
+    margin-bottom: 0;
+  }
+}
+
+/* Pull to Refresh Animation */
+@keyframes pull-down {
+  0% {
+    transform: translateY(-100%) rotate(0deg);
+    opacity: 0;
+  }
+  50% {
+    transform: translateY(0) rotate(180deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-100%) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+.animate-pull-refresh {
+  animation: pull-down 1.5s ease-in-out infinite;
+}
+
+/* Better Skeleton Loading */
+@keyframes skeleton-wave {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton-wave {
+  background: linear-gradient(
+    90deg,
+    rgba(55, 65, 81, 0.4) 0%,
+    rgba(107, 114, 128, 0.5) 50%,
+    rgba(55, 65, 81, 0.4) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-wave 1.5s ease-in-out infinite;
+}
+
+/* Swipe Gesture Hint Animation */
+@keyframes swipe-hint {
+  0%, 100% {
+    transform: translateX(0);
+    opacity: 0.5;
+  }
+  50% {
+    transform: translateX(-10px);
+    opacity: 1;
+  }
+}
+
+.animate-swipe-hint {
+  animation: swipe-hint 2s ease-in-out infinite;
+}
+
+/* Mobile Tabs Scrollable */
+.mobile-tabs-scroll {
+  display: flex;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x mandatory;
+}
+
+.mobile-tabs-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.mobile-tabs-scroll > * {
+  scroll-snap-align: start;
+  flex-shrink: 0;
+}
+
+/* Touch Feedback */
+.touch-feedback {
+  transition: transform 0.1s ease, opacity 0.1s ease;
+}
+
+.touch-feedback:active {
+  transform: scale(0.97);
+  opacity: 0.8;
+}
+
+/* Haptic-like visual feedback */
+@keyframes haptic-pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(0.98);
+  }
+}
+
+.haptic-feedback {
+  animation: haptic-pulse 0.15s ease-in-out;
+}
+
+/* Gradient Border Animation */
+@keyframes gradient-border {
+  0%, 100% {
+    border-color: rgba(147, 51, 234, 0.5);
+  }
+  50% {
+    border-color: rgba(59, 130, 246, 0.5);
+  }
+}
+
+.animate-gradient-border {
+  animation: gradient-border 3s ease-in-out infinite;
+}
