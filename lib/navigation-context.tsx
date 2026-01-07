@@ -5,15 +5,23 @@ import React, { createContext, useContext, useState, ReactNode } from 'react';
 interface NavigationContextType {
   isBottomNavHidden: boolean;
   setIsBottomNavHidden: (hidden: boolean) => void;
+  isSidebarHidden: boolean;
+  setIsSidebarHidden: (hidden: boolean) => void;
 }
 
 const NavigationContext = createContext<NavigationContextType | undefined>(undefined);
 
 export function NavigationProvider({ children }: { children: ReactNode }) {
   const [isBottomNavHidden, setIsBottomNavHidden] = useState(false);
+  const [isSidebarHidden, setIsSidebarHidden] = useState(false);
 
   return (
-    <NavigationContext.Provider value={{ isBottomNavHidden, setIsBottomNavHidden }}>
+    <NavigationContext.Provider value={{
+      isBottomNavHidden,
+      setIsBottomNavHidden,
+      isSidebarHidden,
+      setIsSidebarHidden
+    }}>
       {children}
     </NavigationContext.Provider>
   );

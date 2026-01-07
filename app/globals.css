@@ -1,53 +1,125 @@
 @import "tailwindcss";
 
-/* Mobile Chat Stability - WhatsApp Style */
+/* Enhanced Mobile Chat Stability - WhatsApp Style */
 @layer utilities {
   .mobile-chat-stable {
-    /* WhatsApp-style viewport handling */
-    height: calc(var(--vh, 1vh) * 100);
-    max-height: calc(var(--vh, 1vh) * 100);
-    overflow: hidden;
-    position: relative;
-    /* Prevent layout shifts */
-    contain: layout style paint;
+    /* Only apply mobile styles on mobile screens */
+    /* On PC screens, use normal positioning */
   }
 
   .chat-messages-container {
-    /* WhatsApp-style smooth scrolling */
+    /* WhatsApp-style smooth scrolling with enhanced stability */
     -webkit-overflow-scrolling: touch;
     scroll-behavior: smooth;
     overscroll-behavior-y: contain;
-    /* Prevent content jumping */
+    overscroll-behavior-x: none;
+    /* Prevent content jumping and improve scrolling */
     will-change: scroll-position;
-    /* Better performance on mobile */
     transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    /* Better touch handling */
+    touch-action: pan-y;
+    /* Prevent text selection issues on mobile */
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    /* Re-enable for inputs */
+    input, textarea, [contenteditable] {
+      -webkit-user-select: text;
+      -moz-user-select: text;
+      -ms-user-select: text;
+      user-select: text;
+    }
   }
 
   .chat-input-stable {
-    /* WhatsApp-style fixed input positioning */
-    position: sticky;
-    bottom: 0;
-    z-index: 10;
+    /* Enhanced WhatsApp-style fixed input positioning */
+    position: absolute !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 10 !important;
     /* Prevent input from jumping when keyboard appears */
     transform: translateZ(0);
-    /* Ensure input stays visible */
-    background: rgba(17, 24, 39, 0.95);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    -webkit-transform: translateZ(0);
+    will-change: transform;
+    /* Ensure input stays visible with better backdrop */
+    background: rgba(17, 24, 39, 0.98) !important;
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
+    /* Add subtle border for better definition */
+    border-top: 1px solid rgba(55, 65, 81, 0.5);
+    /* Prevent layout shifts */
+    contain: layout style;
+    /* Ensure proper touch handling */
+    touch-action: manipulation;
   }
 
-  /* Mobile-specific optimizations */
+  /* Enhanced mobile-specific optimizations */
   @media (max-width: 1023px) {
     .mobile-chat-stable {
-      /* Ensure full height on mobile */
+      /* WhatsApp-style viewport handling with enhanced stability for mobile only */
+      height: calc(var(--vh, 1vh) * 100);
+      max-height: calc(var(--vh, 1vh) * 100);
+      overflow: hidden;
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      bottom: 0 !important;
+      /* Prevent layout shifts and improve performance */
+      contain: layout style paint;
+      will-change: transform;
+      transform: translateZ(0);
+      -webkit-transform: translateZ(0);
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      /* Ensure proper stacking */
+      z-index: 1;
+      /* Ensure full height on mobile with keyboard handling */
       min-height: calc(var(--vh, 1vh) * 100);
+      /* Better viewport handling */
+      viewport-fit: cover;
+      /* Prevent zoom on input focus */
+      touch-action: manipulation;
     }
 
     .chat-messages-container {
-      /* Optimize for touch scrolling */
+      /* Enhanced touch scrolling */
       -webkit-overflow-scrolling: touch;
-      /* Prevent momentum scrolling issues */
+      /* Better momentum scrolling control */
       overscroll-behavior: contain;
+      /* Prevent horizontal scrolling issues */
+      overflow-x: hidden;
+      /* Better performance */
+      -webkit-transform: translate3d(0, 0, 0);
+      transform: translate3d(0, 0, 0);
+    }
+
+    .chat-input-stable {
+      /* Mobile keyboard specific positioning */
+      padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+      /* Ensure visibility when keyboard is present */
+      position: fixed !important;
+      /* Better input handling */
+      input, textarea {
+        /* Prevent zoom on iOS */
+        font-size: 16px !important;
+        /* Better touch targets */
+        min-height: 44px !important;
+      }
+    }
+
+    /* Keyboard-specific adjustments */
+    .keyboard-visible .chat-messages-container {
+      /* Reduce height when keyboard is visible */
+      max-height: calc(100vh - 120px - var(--keyboard-height, 0px)) !important;
+    }
+
+    .keyboard-visible .chat-input-stable {
+      /* Adjust input position when keyboard is visible */
+      bottom: var(--keyboard-height, 0px) !important;
     }
 
     /* Prevent layout shifts during transitions */
@@ -71,6 +143,119 @@
     /* Use GPU acceleration for better performance */
     transform: translateZ(0);
     -webkit-transform: translateZ(0);
+  }
+
+  /* Chat window card styling for PC screens */
+  .chat-window-card {
+    /* Default PC styling */
+    position: relative;
+    height: 100%;
+    max-height: none; /* Allow natural height on PC */
+  }
+
+  /* Chat messages container for PC screens */
+  .chat-messages-pc {
+    /* Default PC styling - natural height */
+    height: auto;
+    max-height: none;
+  }
+
+  /* Large screen chat container optimizations - Premium Layout */
+  .chat-window-card,
+  .chat-list-card {
+    /* Comfortable height for premium chat experience */
+    min-height: 450px;
+    max-height: 550px; /* Prevent excessive height and scrolling */
+    /* Premium rounded corners */
+    border-radius: 12px;
+  }
+
+  /* Grid layout (no chat selected) */
+  .chat-list-card {
+    /* Chat list should be narrower in grid */
+    max-width: 350px;
+  }
+
+  .chat-window-card {
+    /* Chat window should be wider for better message visibility in grid */
+    min-width: 500px;
+  }
+
+  /* Flex layout (chat selected) - Full width usage */
+  .chat-list-card.flex {
+    width: 320px; /* Fixed width for chat list when chat is open */
+    max-width: 320px;
+    flex-shrink: 0;
+  }
+
+  .chat-window-card.flex {
+    flex: 1; /* Take remaining space */
+    min-width: 0; /* Allow shrinking */
+    max-width: none; /* No max width restriction */
+  }
+
+  @media (min-width: 1024px) {
+    .chat-window-card,
+    .chat-list-card {
+      /* Large screens get optimal height for productivity */
+      min-height: 500px;
+      max-height: 600px;
+      /* Enhanced premium styling */
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Sidebar layout - chat list acts as fixed sidebar */
+    .chat-list-card {
+      /* Responsive sidebar width for better fit */
+      width: 100%;
+      max-width: 320px;
+    }
+
+    .chat-window-card {
+      /* Main content area takes remaining space */
+      flex: 1;
+      min-width: 0;
+    }
+  }
+
+  @media (min-width: 1280px) {
+    .chat-window-card,
+    .chat-list-card {
+      /* Extra large screens get premium height */
+      min-height: 550px;
+      max-height: 650px;
+      /* Maximum premium effect */
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
+    }
+
+    /* Sidebar layout for extra large screens */
+    .chat-list-card {
+      /* Optimized sidebar width for extra large screens */
+      width: 100%;
+      max-width: 360px;
+    }
+
+    .chat-window-card {
+      /* Main content area takes remaining space */
+      flex: 1;
+      min-width: 0;
+    }
+  }
+
+  /* Mobile overrides */
+  @media (max-width: 1023px) {
+    .chat-window-card {
+      /* Mobile specific styling */
+      position: relative;
+      height: 100%;
+      max-height: calc(var(--vh, 1vh) * 100);
+      will-change: transform;
+    }
+
+    .chat-messages-pc {
+      /* Mobile specific styling - dynamic height set by JS */
+      height: 100%;
+    }
   }
 }
 

@@ -30,6 +30,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useNavigationVisibility } from "@/lib/navigation-context";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -47,6 +48,7 @@ export default function Navbar() {
   const { data: session, update: updateSession } = useSession();
   const router = useRouter();
   const pathname = usePathname();
+  const { isSidebarHidden } = useNavigationVisibility();
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -290,7 +292,9 @@ export default function Navbar() {
       </nav>
 
       {/* Sidebar Navigation (Desktop) - Enhanced */}
-      <aside className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:block lg:w-64 xl:w-72 lg:pt-16">
+      <aside className={`hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:block lg:w-64 xl:w-72 lg:pt-16 transition-all duration-300 ${
+        isSidebarHidden ? 'lg:-translate-x-full lg:opacity-0' : 'lg:translate-x-0 lg:opacity-100'
+      }`}>
         <div className="h-full bg-gray-900/40 backdrop-blur-xl border-r border-gray-800/50 overflow-y-auto custom-scrollbar" style={{ height: 'calc(100vh - 4rem)' }}>
           <nav className="p-4 sm:p-6 space-y-1.5">
             {navItems.map((item) => {

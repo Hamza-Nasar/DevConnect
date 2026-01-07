@@ -83,12 +83,29 @@ export default function ChatPage() {
   const { callUser: initiateGlobalCall } = useCall();
 
   // Navigation visibility control
-  const { setIsBottomNavHidden } = useNavigationVisibility();
+  const { setIsBottomNavHidden, setIsSidebarHidden } = useNavigationVisibility();
 
   // Update bottom nav visibility when chat selection changes
   useEffect(() => {
     setIsBottomNavHidden(!!selectedChat);
   }, [selectedChat, setIsBottomNavHidden]);
+
+  // Handle sidebar visibility based on chat selection
+  useEffect(() => {
+    if (selectedChat) {
+      // Hide sidebar when a chat is selected
+      setIsSidebarHidden(true);
+    } else {
+      // Show sidebar when on message list page
+      setIsSidebarHidden(false);
+    }
+  }, [selectedChat, setIsSidebarHidden]);
+
+  // Handle back button - go back to message list
+  const handleBackToMessages = () => {
+    setSelectedChat(null);
+    setIsSidebarHidden(false);
+  };
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -111,84 +128,206 @@ export default function ChatPage() {
     }
   }, [session?.user?.id]);
 
-  // Handle mobile keyboard layout stability - WhatsApp style
+  // Handle mobile keyboard layout stability - Enhanced WhatsApp style (Mobile Only)
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
+    // Only apply mobile keyboard handling on mobile/tablet screens
+    if (window.innerWidth >= 1024) return;
+
     const chatContainer = document.getElementById('chat-container') as HTMLElement;
     const messagesContainer = document.querySelector('.chat-messages-container') as HTMLElement;
+    const chatInput = document.querySelector('.chat-input-stable') as HTMLElement;
 
     if (!chatContainer) return;
 
-    // WhatsApp-style keyboard handling: No transform scaling, just proper height management
-    const updateViewportHeight = () => {
-      if (window.innerWidth >= 1024) return; // Only on mobile/tablet
+    let initialViewportHeight = window.innerHeight;
+    let keyboardVisible = false;
+    let lastScrollPosition = 0;
 
-      // Use CSS custom property to set dynamic height
+    // Enhanced viewport height calculation
+    const updateViewportHeight = () => {
+      const currentHeight = window.innerHeight;
+      const heightDifference = initialViewportHeight - currentHeight;
+
+      // Detect if keyboard is visible (significant height reduction)
+      keyboardVisible = heightDifference > 150; // Keyboard threshold
+
+      // Use CSS custom property for dynamic height
       const vh = window.innerHeight * 0.01;
       document.documentElement.style.setProperty('--vh', `${vh}px`);
+      document.documentElement.style.setProperty('--keyboard-height', `${Math.max(0, heightDifference)}px`);
 
-      // Update container height without transform scaling
+      // Apply stable positioning
+      chatContainer.style.position = 'fixed';
+      chatContainer.style.top = '0';
+      chatContainer.style.left = '0';
+      chatContainer.style.right = '0';
+      chatContainer.style.bottom = '0';
       chatContainer.style.height = `calc(var(--vh, 1vh) * 100)`;
       chatContainer.style.maxHeight = `calc(var(--vh, 1vh) * 100)`;
+      chatContainer.style.overflow = 'hidden';
 
-      // Adjust messages container height to account for header and input
-      if (messagesContainer) {
-        const headerHeight = 64; // Approximate header height
-        const inputHeight = 80; // Approximate input height
-        const availableHeight = window.innerHeight - headerHeight - inputHeight;
-        messagesContainer.style.maxHeight = `${Math.max(availableHeight, 200)}px`;
+      // Adjust messages container with precise calculations
+      if (messagesContainer && chatInput) {
+        const headerHeight = 80; // Header height
+        const inputHeight = keyboardVisible ? 60 : 80; // Input height (smaller when keyboard visible)
+        const safeArea = keyboardVisible ? 20 : 0; // Extra padding for keyboard
+        const availableHeight = window.innerHeight - headerHeight - inputHeight - safeArea;
+
+        messagesContainer.style.height = `${Math.max(availableHeight, 150)}px`;
+        messagesContainer.style.maxHeight = `${Math.max(availableHeight, 150)}px`;
+        messagesContainer.style.overflowY = 'auto';
+        messagesContainer.style.overflowAnchor = 'auto';
+
+        // Position input at bottom
+        if (chatInput) {
+          chatInput.style.position = keyboardVisible ? 'absolute' : 'relative';
+          chatInput.style.bottom = '0';
+          chatInput.style.left = '0';
+          chatInput.style.right = '0';
+          chatInput.style.zIndex = '10';
+        }
+      }
+
+      // Maintain scroll position during keyboard transitions
+      if (keyboardVisible && lastScrollPosition > 0) {
+        setTimeout(() => {
+          if (messagesContainer) {
+            messagesContainer.scrollTop = lastScrollPosition;
+          }
+        }, 100);
       }
     };
 
     const handleOrientationChange = () => {
-      // Reset after orientation change
-      setTimeout(updateViewportHeight, 100);
+      // Reset viewport height after orientation change
+      setTimeout(() => {
+        initialViewportHeight = window.innerHeight;
+        updateViewportHeight();
+      }, 300);
+    };
+
+    const handleScroll = () => {
+      if (messagesContainer) {
+        lastScrollPosition = messagesContainer.scrollTop;
+      }
+    };
+
+    const handleFocusIn = (e: FocusEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+        keyboardVisible = true;
+        // Add keyboard-visible class for CSS styling
+        chatContainer?.classList.add('keyboard-visible');
+        // Store scroll position before keyboard appears
+        if (messagesContainer) {
+          lastScrollPosition = messagesContainer.scrollTop;
+        }
+        // Delay to allow keyboard animation to complete
+        setTimeout(updateViewportHeight, 400);
+      }
+    };
+
+    const handleFocusOut = (e: FocusEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+        keyboardVisible = false;
+        // Remove keyboard-visible class
+        chatContainer?.classList.remove('keyboard-visible');
+        // Delay to allow keyboard animation to complete
+        setTimeout(() => {
+          updateViewportHeight();
+          // Restore scroll position
+          if (messagesContainer) {
+            setTimeout(() => {
+              messagesContainer.scrollTop = lastScrollPosition;
+            }, 100);
+          }
+        }, 400);
+      }
     };
 
     // Initialize
+    initialViewportHeight = window.innerHeight;
     updateViewportHeight();
 
-    // Listen for viewport changes (keyboard show/hide)
+    // Event listeners
     window.addEventListener('resize', updateViewportHeight);
     window.addEventListener('orientationchange', handleOrientationChange);
 
-    // Use visualViewport for more precise detection on supported browsers
+    // Enhanced Visual Viewport API support
     if (window.visualViewport) {
       window.visualViewport.addEventListener('resize', updateViewportHeight);
+      window.visualViewport.addEventListener('scroll', updateViewportHeight);
     }
 
-    // Handle focus events for input stability
-    const handleFocusIn = () => {
-      setTimeout(updateViewportHeight, 300); // Allow time for keyboard to appear
-    };
-
-    const handleFocusOut = () => {
-      setTimeout(updateViewportHeight, 300); // Allow time for keyboard to disappear
-    };
-
+    // Focus/blur events for input stability
     document.addEventListener('focusin', handleFocusIn);
     document.addEventListener('focusout', handleFocusOut);
 
-    return () => {
-      window.removeEventListener('resize', updateViewportHeight);
-      window.removeEventListener('orientationchange', handleOrientationChange);
-      if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', updateViewportHeight);
-      }
-      document.removeEventListener('focusin', handleFocusIn);
-      document.removeEventListener('focusout', handleFocusOut);
+    // Scroll tracking
+    if (messagesContainer) {
+      messagesContainer.addEventListener('scroll', handleScroll);
+    }
 
-      // Reset styles
-      if (chatContainer) {
-        chatContainer.style.height = '';
-        chatContainer.style.maxHeight = '';
-      }
-      if (messagesContainer) {
-        messagesContainer.style.maxHeight = '';
+    // Handle page visibility changes
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        setTimeout(updateViewportHeight, 100);
       }
     };
-  }, []);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      // Cleanup all event listeners
+      window.removeEventListener('resize', updateViewportHeight);
+      window.removeEventListener('orientationchange', handleOrientationChange);
+
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', updateViewportHeight);
+        window.visualViewport.removeEventListener('scroll', updateViewportHeight);
+      }
+
+      document.removeEventListener('focusin', handleFocusIn);
+      document.removeEventListener('focusout', handleFocusOut);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+
+      if (messagesContainer) {
+        messagesContainer.removeEventListener('scroll', handleScroll);
+      }
+
+      // Reset all styles
+      document.documentElement.style.removeProperty('--vh');
+      document.documentElement.style.removeProperty('--keyboard-height');
+
+      if (chatContainer) {
+        chatContainer.style.position = '';
+        chatContainer.style.top = '';
+        chatContainer.style.left = '';
+        chatContainer.style.right = '';
+        chatContainer.style.bottom = '';
+        chatContainer.style.height = '';
+        chatContainer.style.maxHeight = '';
+        chatContainer.style.overflow = '';
+      }
+
+      if (messagesContainer) {
+        messagesContainer.style.height = '';
+        messagesContainer.style.maxHeight = '';
+        messagesContainer.style.overflowY = '';
+        messagesContainer.style.overflowAnchor = '';
+      }
+
+      if (chatInput) {
+        chatInput.style.position = '';
+        chatInput.style.bottom = '';
+        chatInput.style.left = '';
+        chatInput.style.right = '';
+        chatInput.style.zIndex = '';
+      }
+    };
+  }, [selectedChat]); // Re-run when chat selection changes
 
   useEffect(() => {
     if (!session?.user?.id) return;
@@ -1152,16 +1291,46 @@ export default function ChatPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 transition-all duration-300">
       <div className={`${selectedChat ? "hidden lg:block" : "block transition-all duration-300"}`}>
-        <Navbar />
+        <div className="relative">
+          <Navbar />
+          {/* Back Button when chat is selected */}
+          {selectedChat && (
+            <div className="absolute top-4 left-4 z-50">
+              <Button
+                variant="secondary"
+                size="icon"
+                onClick={handleBackToMessages}
+                className="bg-gray-800/90 backdrop-blur-sm border border-gray-700 hover:bg-gray-700/90 shadow-lg"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
-      <div className={`lg:pl-72 xl:pl-80 transition-all duration-300 ease-in-out ${selectedChat ? "pt-0 lg:pt-16" : "pt-16"}`}>
-        <div className="max-w-7xl mx-auto px-0 sm:px-4 lg:px-8 py-0 sm:py-4 lg:py-8 h-full">
+      <div className={`transition-all duration-300 ease-in-out ${selectedChat ? "pt-0 lg:pt-16" : "pt-16 lg:pl-72 xl:pl-80"}`}>
+        <div className={`px-4 sm:px-6 py-4 sm:py-6 lg:py-8 min-h-screen lg:min-h-[calc(100vh-4rem)] xl:min-h-[calc(100vh-4rem)] ${
+          selectedChat ? "w-full lg:px-12" : "w-full max-w-4xl mx-auto lg:px-8 xl:px-12"
+        }`}>
           <div
             id="chat-container"
-            className="mobile-chat-stable grid grid-cols-1 lg:grid-cols-3 gap-0 sm:gap-4 lg:gap-6 will-change-transform"
+            className={`mobile-chat-stable will-change-transform w-full ${
+              selectedChat
+                ? "flex flex-col lg:flex-row gap-0 lg:gap-6"
+                : "flex flex-col lg:flex-row gap-0 lg:gap-6"
+            }`}
+            style={{
+              // Additional mobile-specific styles
+              WebkitTransform: 'translateZ(0)', // Force hardware acceleration
+              transform: 'translateZ(0)',
+              WebkitBackfaceVisibility: 'hidden',
+              backfaceVisibility: 'hidden',
+              WebkitPerspective: 1000,
+              perspective: 1000,
+            }}
           >
             {/* Chat List - Enhanced Design */}
-            <Card variant="elevated" className={`lg:col-span-1 p-0 overflow-hidden flex flex-col ${selectedChat ? "hidden lg:flex" : "flex"} bg-gray-900/60 backdrop-blur-xl border-gray-800 transition-all duration-300 ease-in-out transform-gpu ${selectedChat ? "lg:translate-x-0" : "translate-x-0"}`}>
+            <Card variant="elevated" className="p-0 overflow-hidden flex flex-col bg-gray-900/60 backdrop-blur-xl border-gray-800 transition-all duration-300 ease-in-out transform-gpu chat-list-card w-full lg:w-80 xl:w-96 flex-shrink-0">
               <div className="p-4 border-b border-gray-700/50 bg-gradient-to-r from-purple-600/10 to-blue-600/10">
                 <div className="flex items-center justify-between mb-4">
                   <div>
@@ -1306,14 +1475,11 @@ export default function ChatPage() {
             {/* Chat Window - Enhanced Design */}
             <Card
               variant="elevated"
-              className={`lg:col-span-2 p-0 overflow-hidden flex flex-col ${!selectedChat ? "hidden lg:flex" : "flex"} bg-gray-900/60 backdrop-blur-xl border-gray-800 transition-all duration-300 ease-in-out transform-gpu`}
-              style={{
-                // WhatsApp-style fixed positioning to prevent shaking
-                position: 'relative',
-                height: '100%',
-                maxHeight: 'calc(var(--vh, 1vh) * 100)',
-                willChange: 'transform'
-              }}
+              className={`p-0 overflow-hidden flex flex-col bg-gray-900/60 backdrop-blur-xl border-gray-800 transition-all duration-300 ease-in-out transform-gpu chat-window-card ${
+                selectedChat
+                  ? "flex flex-1 min-w-0"
+                  : "hidden lg:flex"
+              }`}
             >
               {selectedChat ? (
                 <>
@@ -1399,11 +1565,10 @@ export default function ChatPage() {
 
                   {/* Messages - Enhanced */}
                   <div
-                    className="chat-messages-container flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 lg:p-6 space-y-3 sm:space-y-4 bg-background/50 custom-scrollbar"
+                    className="chat-messages-container flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 lg:p-6 space-y-3 sm:space-y-4 bg-background/50 custom-scrollbar chat-messages-pc"
                     style={{
                       overflowAnchor: 'auto',
-                      height: '100%',
-                      // Dynamic height will be set by JavaScript for mobile stability
+                      // Dynamic height will be set by JavaScript for mobile stability, natural height on PC
                       minHeight: '200px'
                     }}
                   >
@@ -1545,8 +1710,16 @@ export default function ChatPage() {
                     </motion.div>
                   )}
 
-                  {/* Message Input - Enhanced */}
-                  <div className="chat-input-stable p-2 sm:p-4 border-t border-gray-700/50 bg-gray-900/50">
+                  {/* Message Input - Enhanced with Mobile Stability */}
+                  <div
+                    className="chat-input-stable p-2 sm:p-4 border-t border-gray-700/50 bg-gray-900/50"
+                    style={{
+                      position: 'relative',
+                      zIndex: 10,
+                      WebkitTransform: 'translateZ(0)',
+                      transform: 'translateZ(0)',
+                    }}
+                  >
                     <div className="flex items-center gap-2">
                       <div className="relative flex-shrink-0">
                         <Button
@@ -1691,11 +1864,12 @@ export default function ChatPage() {
                   <motion.div
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    className="text-center text-gray-400"
+                    className="text-center text-gray-400 max-w-md"
                   >
-                    <MessageCircle className="h-20 w-20 mx-auto mb-4 opacity-50" />
-                    <p className="text-xl font-medium mb-2">Select a conversation</p>
-                    <p className="text-sm">Choose a chat from the list to start messaging</p>
+                    <MessageCircle className="h-24 w-24 mx-auto mb-6 opacity-60" />
+                    <h2 className="text-2xl font-bold mb-3 text-gray-300">Welcome to Messages</h2>
+                    <p className="text-lg mb-2">Connect with your friends and colleagues</p>
+                    <p className="text-sm opacity-75">Select a conversation from the sidebar to start chatting</p>
                   </motion.div>
                 </div>
               )}
