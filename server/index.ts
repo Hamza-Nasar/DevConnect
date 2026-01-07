@@ -295,6 +295,30 @@ export function initializeSocket(server: HTTPServer) {
       socket.leave(`post:${postId}`);
     });
 
+    // Group room handlers
+    socket.on("join_group", (groupId: string) => {
+      socket.join(`group:${groupId}`);
+      console.log(`👥 [Server] User ${socket.userId} joined group room: ${groupId}`);
+    });
+
+    socket.on("leave_group", (groupId: string) => {
+      socket.leave(`group:${groupId}`);
+      console.log(`👥 [Server] User ${socket.userId} left group room: ${groupId}`);
+    });
+
+    // Group share and report events
+    socket.on("share_group", (data: { groupId: string; userId: string; groupName: string }) => {
+      console.log(`🔗 [Server] Group shared: ${data.groupName} by ${data.userId}`);
+      // Emit to group room to notify other members
+      socket.to(`group:${data.groupId}`).emit("group_shared", data);
+    });
+
+    socket.on("report_group", (data: { groupId: string; userId: string; groupName: string }) => {
+      console.log(`🚨 [Server] Group reported: ${data.groupName} by ${data.userId}`);
+      // Emit to group room (admins only) or just log for moderation
+      socket.to(`group:${data.groupId}`).emit("group_reported", data);
+    });
+
     // Handle post view - broadcast to all users viewing this post
     socket.on("post_view", (data: { postId: string; viewsCount: number }) => {
       io.to(`post:${data.postId}`).emit("views_updated", {

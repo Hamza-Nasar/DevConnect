@@ -237,13 +237,31 @@ export default function Navbar() {
               {/* User Avatar - Always visible */}
               <div className="relative group">
                 <button
-                  onClick={() => {
-                    // Use actual username from session
-                    const username = session.user?.username ||
-                      session.user?.name?.toLowerCase().replace(/\s+/g, '') ||
-                      session.user?.email?.split('@')[0] ||
-                      'user';
-                    router.push(`/profile/${username}`);
+                  onClick={async () => {
+                    try {
+                      // First try to use username from session
+                      let username = session.user?.username;
+
+                      // If no username in session, fetch user data to get the correct username
+                      if (!username && session.user?.id) {
+                        const res = await fetch('/api/profile/basic');
+                        if (res.ok) {
+                          const userData = await res.json();
+                          username = userData.username;
+                        }
+                      }
+
+                      // Fallback: use user ID if we can't get username
+                      if (!username) {
+                        username = session.user?.id;
+                      }
+
+                      router.push(`/profile/${username}`);
+                    } catch (error) {
+                      console.error('Error navigating to profile:', error);
+                      // Fallback to user ID
+                      router.push(`/profile/${session.user?.id || 'user'}`);
+                    }
                   }}
                   className="flex items-center space-x-2 p-1 rounded-lg hover:bg-gray-800 transition"
                 >

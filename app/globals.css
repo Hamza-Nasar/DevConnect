@@ -1,5 +1,79 @@
 @import "tailwindcss";
 
+/* Mobile Chat Stability - WhatsApp Style */
+@layer utilities {
+  .mobile-chat-stable {
+    /* WhatsApp-style viewport handling */
+    height: calc(var(--vh, 1vh) * 100);
+    max-height: calc(var(--vh, 1vh) * 100);
+    overflow: hidden;
+    position: relative;
+    /* Prevent layout shifts */
+    contain: layout style paint;
+  }
+
+  .chat-messages-container {
+    /* WhatsApp-style smooth scrolling */
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+    overscroll-behavior-y: contain;
+    /* Prevent content jumping */
+    will-change: scroll-position;
+    /* Better performance on mobile */
+    transform: translateZ(0);
+  }
+
+  .chat-input-stable {
+    /* WhatsApp-style fixed input positioning */
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+    /* Prevent input from jumping when keyboard appears */
+    transform: translateZ(0);
+    /* Ensure input stays visible */
+    background: rgba(17, 24, 39, 0.95);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+
+  /* Mobile-specific optimizations */
+  @media (max-width: 1023px) {
+    .mobile-chat-stable {
+      /* Ensure full height on mobile */
+      min-height: calc(var(--vh, 1vh) * 100);
+    }
+
+    .chat-messages-container {
+      /* Optimize for touch scrolling */
+      -webkit-overflow-scrolling: touch;
+      /* Prevent momentum scrolling issues */
+      overscroll-behavior: contain;
+    }
+
+    /* Prevent layout shifts during transitions */
+    .mobile-chat-stable * {
+      /* Ensure smooth transitions */
+      transition-property: transform, opacity, height, max-height;
+      transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Optimize input handling */
+    .chat-input-stable input {
+      /* Prevent zoom on iOS */
+      font-size: 16px;
+      /* Better touch targets */
+      min-height: 44px;
+    }
+  }
+
+  /* Prevent flickering during layout changes */
+  .mobile-chat-stable {
+    /* Use GPU acceleration for better performance */
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+  }
+}
+
 @layer base {
   :root {
     /* Semantic Color Tokens */

@@ -5,6 +5,7 @@ import { ToastProvider } from "@/components/ui/toast";
 import { SmoothScroll } from "@/components/layouts/SmoothScroll";
 import MobileBottomNav from "@/components/navigation/MobileBottomNav";
 import FloatingActionButton from "@/components/actions/FloatingActionButton";
+import { NavigationProvider } from "@/lib/navigation-context";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -26,10 +27,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <SmoothScroll>
           <SessionProvider>
             <CallProvider>
-              <ToastProvider />
-              {children}
-              <MobileBottomNav />
-              <FloatingActionButton />
+              <NavigationProvider>
+                <ToastProvider />
+                {children}
+                <MobileBottomNav />
+                <FloatingActionButton />
+              </NavigationProvider>
             </CallProvider>
           </SessionProvider>
         </SmoothScroll>

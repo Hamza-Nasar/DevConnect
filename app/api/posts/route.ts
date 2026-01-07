@@ -23,6 +23,7 @@ interface PostRequestBody {
     hashtags?: string[];
     location?: string;
     isPublic?: boolean;
+    groupId?: string;
     linkPreview?: {
         url: string;
         title: string;
@@ -49,7 +50,7 @@ export async function POST(req: Request) {
         }
 
         const body: PostRequestBody = await req.json();
-        const { title, content, images, video, hashtags, location, isPublic, linkPreview, postType, codeSnippet, language, framework, saveToKnowledgeBase } = body;
+        const { title, content, images, video, hashtags, location, isPublic, groupId, linkPreview, postType, codeSnippet, language, framework, saveToKnowledgeBase } = body;
 
         if (!content?.trim() && (!images || images.length === 0) && !video) {
             return NextResponse.json({ error: "Content, images, or video required" }, { status: 400 });
@@ -76,6 +77,7 @@ export async function POST(req: Request) {
             location: location || null,
             linkPreview: linkPreview || null,
             isPublic: isPublic !== false,
+            groupId: groupId || null,
             postType: postType || "regular",
             codeSnippet: codeSnippet || null,
             language: language || null,
@@ -138,19 +140,31 @@ export async function POST(req: Request) {
                 // Broadcast to all users (real-time feed update)
                 io.emit("new_post", fullPostData);
 
-                // Get user's followers and notify them
-                try {
-                    const followsCollection = await getCollection(COLLECTIONS.FOLLOWS);
-                    const followers = await followsCollection
-                        .find({ followingId: toStringId(user._id) })
-                        .toArray() as WithId<Document>[];
-
-                    followers.forEach((follow) => {
-                        io.to(`user:${follow.followerId}`).emit("new_post", fullPostData);
+                // If this is a group post, emit to group room
+                if (groupId) {
+                    io.to(`group:${groupId}`).emit("group_new_post", {
+                        groupId,
+                        post: postResponse,
+                        postsCount: 0 // Will be updated by group API
                     });
-                } catch (error: unknown) {
-                    const message = error instanceof Error ? error.message : String(error);
-                    console.warn("Could not notify followers:", message);
+                    console.log("📝 Group post emitted to room:", `group:${groupId}`);
+                }
+
+                // Get user's followers and notify them (only for non-group posts)
+                if (!groupId) {
+                    try {
+                        const followsCollection = await getCollection(COLLECTIONS.FOLLOWS);
+                        const followers = await followsCollection
+                            .find({ followingId: toStringId(user._id) })
+                            .toArray() as WithId<Document>[];
+
+                        followers.forEach((follow) => {
+                            io.to(`user:${follow.followerId}`).emit("new_post", fullPostData);
+                        });
+                    } catch (error: unknown) {
+                        const message = error instanceof Error ? error.message : String(error);
+                        console.warn("Could not notify followers:", message);
+                    }
                 }
 
                 // Notify the poster

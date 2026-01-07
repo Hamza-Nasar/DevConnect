@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSession } from "next-auth/react";
+import { motion, AnimatePresence } from "framer-motion";
 import PostItem from "./PostItem";
 import { InfiniteScroll } from "@/components/infinite-scroll/InfiniteScroll";
 import getSocket from "@/lib/socket";
@@ -213,11 +214,32 @@ export default function PostList({ onDelete, filter = "All" }: PostListProps) {
       isLoading={isLoading}
       endMessage={<p className="text-gray-400">No more posts to load</p>}
     >
-      <div className="space-y-6">
-        {uniquePosts.map((post, index) => (
-          <PostItem key={`${post.id}-${index}`} post={post} onDelete={onDelete} />
-        ))}
-      </div>
+      <motion.div
+        className="space-y-6"
+        key={filter} // Re-animate when filter changes
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3 }}
+      >
+        <AnimatePresence mode="popLayout">
+          {uniquePosts.map((post, index) => (
+            <motion.div
+              key={`${post.id}-${filter}`}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20, scale: 0.95 }}
+              transition={{
+                duration: 0.4,
+                delay: index * 0.05,
+                ease: "easeOut"
+              }}
+              layout
+            >
+              <PostItem post={post} onDelete={onDelete} />
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </motion.div>
     </InfiniteScroll>
   );
 }

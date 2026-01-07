@@ -31,9 +31,20 @@ export default function NotificationBell() {
         if (res.ok) {
           setNotifications(data.notifications || []);
           setUnreadCount(data.unreadCount || 0);
+        } else {
+          // Handle specific error cases
+          if (res.status === 401) {
+            console.warn("Unauthorized to fetch notifications");
+          } else if (res.status === 503) {
+            console.warn("Database connection error:", data.error);
+          } else if (res.status === 504) {
+            console.warn("Database timeout:", data.error);
+          } else {
+            console.error("Error fetching notifications:", data.error || res.statusText);
+          }
         }
       } catch (error) {
-        console.error("Error fetching notifications:", error);
+        console.error("Network error fetching notifications:", error);
       }
     };
 

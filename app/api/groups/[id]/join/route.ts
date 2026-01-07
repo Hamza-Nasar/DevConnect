@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getCollection } from "@/lib/mongodb";
-import { toObjectId } from "@/lib/db";
+import { toObjectId, COLLECTIONS } from "@/lib/db";
 
 export async function POST(
   req: NextRequest,
@@ -19,8 +19,8 @@ export async function POST(
     if (!idObj) {
       return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
     }
-    const groupsCollection = await getCollection("groups");
-    const groupMembersCollection = await getCollection("groupMembers");
+    const groupsCollection = await getCollection(COLLECTIONS.GROUPS);
+    const groupMembersCollection = await getCollection(COLLECTIONS.GROUP_MEMBERS);
 
     const group = await groupsCollection.findOne({ _id: idObj });
     if (!group) {
@@ -50,6 +50,29 @@ export async function POST(
       { _id: idObj },
       { $inc: { membersCount: 1 } }
     );
+
+    // Emit real-time event for group member joined
+    const { emitToRoom } = await import("@/lib/socket-server");
+    const usersCollection = await getCollection(COLLECTIONS.USERS);
+    const userIdObj = toObjectId(session.user.id);
+    const user = userIdObj ? await usersCollection.findOne({ _id: userIdObj }) : null;
+
+    if (user) {
+      const memberData = {
+        id: user._id.toString(),
+        name: user.name,
+        username: user.username,
+        avatar: user.image || user.avatar,
+        role: "member",
+        joinedAt: new Date().toISOString()
+      };
+
+      emitToRoom(`group:${id}`, "group_member_joined", {
+        groupId: id,
+        member: memberData,
+        membersCount: group.membersCount + 1
+      });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

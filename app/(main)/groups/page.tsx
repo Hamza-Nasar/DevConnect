@@ -231,7 +231,7 @@ export default function GroupsPage() {
             ) : (
               filteredGroups.map((group, index) => (
                 <motion.div
-                  key={group.id}
+                  key={`${group.id}-${index}`}
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.3, delay: index * 0.1 }}

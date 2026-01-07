@@ -13,6 +13,16 @@ export const getSocketInstance = (): SocketIOServer | null => {
   return global._ioInstance || null;
 };
 
+export const emitToRoom = (room: string, event: string, data: any) => {
+  const io = getSocketInstance();
+  if (io) {
+    io.to(room).emit(event, data);
+    console.log(`📤 [Socket] Emitted ${event} to room ${room}`);
+  } else {
+    console.warn(`⚠️ [Socket] Cannot emit ${event} - socket not initialized`);
+  }
+};
+
 
 
 

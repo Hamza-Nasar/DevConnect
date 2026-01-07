@@ -48,9 +48,20 @@ export default function NotificationCenter() {
       if (res.ok) {
         const data = await res.json();
         setUnreadCount(data.unreadCount || 0);
+      } else {
+        // Handle specific error cases
+        if (res.status === 401) {
+          console.warn("Unauthorized to fetch notification count");
+        } else if (res.status === 503) {
+          console.warn("Database connection error:", await res.text());
+        } else if (res.status === 504) {
+          console.warn("Database timeout:", await res.text());
+        } else {
+          console.error("Error fetching notification count:", res.statusText);
+        }
       }
     } catch (error) {
-      console.error("Error fetching notification count:", error);
+      console.error("Network error fetching notification count:", error);
     }
   };
 

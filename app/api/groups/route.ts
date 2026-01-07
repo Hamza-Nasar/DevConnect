@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getCollection } from "@/lib/mongodb";
+import { COLLECTIONS } from "@/lib/db";
 
 export async function GET(req: NextRequest) {
   try {
@@ -14,9 +15,9 @@ export async function GET(req: NextRequest) {
     const category = searchParams.get("category");
     const query = searchParams.get("q");
 
-    const groupsCollection = await getCollection("groups");
-    const usersCollection = await getCollection("users");
-    const groupMembersCollection = await getCollection("groupMembers");
+    const groupsCollection = await getCollection(COLLECTIONS.GROUPS);
+    const usersCollection = await getCollection(COLLECTIONS.USERS);
+    const groupMembersCollection = await getCollection(COLLECTIONS.GROUP_MEMBERS);
 
     let filter: any = {};
     if (category && category !== "all") {
@@ -36,6 +37,7 @@ export async function GET(req: NextRequest) {
       .toArray();
 
     // Populate admin and check membership
+    const formattedGroups = [];
     for (const group of groups) {
       if (group.adminId) {
         const admin = await usersCollection.findOne({ _id: group.adminId });
@@ -43,14 +45,28 @@ export async function GET(req: NextRequest) {
       }
 
       const membership = await groupMembersCollection.findOne({
-        groupId: group._id,
+        groupId: group._id.toString(),
         userId: session.user.id,
       });
-      group.isMember = !!membership;
-      group.isAdmin = group.adminId === session.user.id;
+
+      formattedGroups.push({
+        id: group._id.toString(),
+        name: group.name,
+        description: group.description,
+        avatar: group.avatar,
+        coverImage: group.coverImage,
+        membersCount: group.membersCount || 0,
+        postsCount: group.postsCount || 0,
+        isPrivate: group.isPrivate || false,
+        isMember: !!membership,
+        isAdmin: group.adminId === session.user.id,
+        category: group.category,
+        createdAt: group.createdAt,
+        admin: group.admin,
+      });
     }
 
-    return NextResponse.json({ groups });
+    return NextResponse.json({ groups: formattedGroups });
   } catch (error: any) {
     console.error("Error fetching groups:", error);
     return NextResponse.json(
@@ -77,8 +93,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const groupsCollection = await getCollection("groups");
-    const groupMembersCollection = await getCollection("groupMembers");
+    const groupsCollection = await getCollection(COLLECTIONS.GROUPS);
+    const groupMembersCollection = await getCollection(COLLECTIONS.GROUP_MEMBERS);
 
     const group = {
       name,

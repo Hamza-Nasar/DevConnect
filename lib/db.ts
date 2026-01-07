@@ -44,6 +44,7 @@ export const COLLECTIONS = {
   USER_SETTINGS: "usersettings", // User settings
   PROFILE_VIEWS: "profileviews", // Profile views
   BOOKMARKS: "bookmarks",        // User bookmarks
+  REPORTS: "reports",            // User reports (posts, groups, etc.)
   METADATA: "devconnect",        // Project metadata - تمام collections کی list
 } as const;
 

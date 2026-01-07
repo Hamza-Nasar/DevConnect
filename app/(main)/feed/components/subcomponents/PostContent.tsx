@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +16,45 @@ interface PostContentProps {
     isExplaining?: boolean;
     onExplainCode?: () => void;
     onFormatCode?: () => void;
+}
+
+// Stable Image Component to prevent layout shifts
+function StableImage({ src, alt, className, aspectRatio = "16/9" }: { src: string; alt: string; className?: string; aspectRatio?: string }) {
+    const [isLoading, setIsLoading] = useState(true);
+    const [hasError, setHasError] = useState(false);
+
+    return (
+        <div className={`relative overflow-hidden rounded-xl bg-gray-800 ${className}`} style={{ aspectRatio }}>
+            {isLoading && (
+                <div className="absolute inset-0 bg-gray-800 animate-pulse flex items-center justify-center">
+                    <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+                </div>
+            )}
+            {!hasError ? (
+                <motion.img
+                    src={src}
+                    alt={alt}
+                    className="w-full h-full object-cover"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: isLoading ? 0 : 1 }}
+                    transition={{ duration: 0.3 }}
+                    loading="lazy"
+                    onLoad={() => setIsLoading(false)}
+                    onError={() => {
+                        setIsLoading(false);
+                        setHasError(true);
+                    }}
+                />
+            ) : (
+                <div className="absolute inset-0 bg-gray-800 flex items-center justify-center">
+                    <div className="text-gray-400 text-center">
+                        <div className="text-2xl mb-2">📷</div>
+                        <div className="text-sm">Image failed to load</div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
 }
 
 export default function PostContent({
@@ -111,11 +151,22 @@ export default function PostContent({
 
             {/* Images */}
             {post.images && post.images.length > 0 && (
-                <div className={`grid gap-2 ${post.images.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
+                <motion.div
+                    className={`grid gap-2 ${post.images.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.4, ease: "easeOut" }}
+                >
                     {post.images.map((img: string, i: number) => (
-                        <img key={i} src={img} alt="" className="w-full h-auto max-h-[500px] object-cover rounded-xl border border-gray-800" />
+                        <StableImage
+                            key={i}
+                            src={img}
+                            alt=""
+                            className="w-full"
+                            aspectRatio="16/9"
+                        />
                     ))}
-                </div>
+                </motion.div>
             )}
 
             {/* Link Preview */}

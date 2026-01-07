@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getCollection } from "@/lib/mongodb";
+import { COLLECTIONS } from "@/lib/db";
 
 export async function GET(req: NextRequest) {
   try {
@@ -10,7 +11,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const membersCollection = await getCollection("groupMembers");
+    const membersCollection = await getCollection(COLLECTIONS.GROUP_MEMBERS);
     const groupsCollection = await getCollection("groups");
 
     const memberships = await membersCollection

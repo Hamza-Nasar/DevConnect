@@ -1,4 +1,4 @@
-import { findUserByUsername, toStringId, getCollection, COLLECTIONS } from "@/lib/db";
+import { findUserByUsername, findUserById, toStringId, getCollection, COLLECTIONS } from "@/lib/db";
 import ProfileClient from "./ProfileClient";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -9,7 +9,18 @@ interface Props {
 
 export default async function ProfilePage({ params }: Props) {
     const { username } = await params;
-    const user = await findUserByUsername(username);
+
+    // Try to find user by username first
+    let user = await findUserByUsername(username);
+
+    // If not found by username, try to find by ID (for cases where ID is passed)
+    if (!user) {
+        try {
+            user = await findUserById(username);
+        } catch (error) {
+            // Invalid ID format, continue with null user
+        }
+    }
 
     if (!user) {
         return (

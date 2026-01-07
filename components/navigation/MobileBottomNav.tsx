@@ -32,6 +32,9 @@ import getSocket from "@/lib/socket";
 import { signOut } from "next-auth/react";
 import { Badge } from "@/components/ui/badge";
 
+// Context for navigation visibility
+import { useNavigationVisibility } from "@/lib/navigation-context";
+
 const navItems = [
   { icon: Home, label: "Home", path: "/feed", activeColor: "from-purple-500 to-blue-500" },
   { icon: Compass, label: "Explore", path: "/explore", activeColor: "from-pink-500 to-orange-500" },
@@ -70,6 +73,7 @@ export default function MobileBottomNav() {
   const pathname = usePathname();
   const router = useRouter();
   const { data: session } = useSession();
+  const { isBottomNavHidden } = useNavigationVisibility();
   const [showCreateMenu, setShowCreateMenu] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [unreadMessages, setUnreadMessages] = useState(0);
@@ -162,6 +166,11 @@ export default function MobileBottomNav() {
     if (path === "/notifications") return unreadNotifications;
     return 0;
   };
+
+  // Hide bottom nav when specified (e.g., when in chat)
+  if (isBottomNavHidden) {
+    return null;
+  }
 
   return (
     <>

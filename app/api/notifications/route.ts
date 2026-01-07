@@ -25,9 +25,25 @@ export async function GET(req: NextRequest) {
     });
   } catch (error: any) {
     console.error("Error fetching notifications:", error);
+
+    // Provide more specific error messages based on the error type
+    let errorMessage = "Failed to fetch notifications";
+    let statusCode = 500;
+
+    if (error.message?.includes("ECONNREFUSED") || error.message?.includes("connection")) {
+      errorMessage = "Database connection error. Please try again later.";
+      statusCode = 503; // Service Unavailable
+    } else if (error.message?.includes("authentication") || error.message?.includes("auth")) {
+      errorMessage = "Database authentication failed.";
+      statusCode = 503;
+    } else if (error.message?.includes("timeout")) {
+      errorMessage = "Database connection timeout. Please try again.";
+      statusCode = 504; // Gateway Timeout
+    }
+
     return NextResponse.json(
-      { error: "Failed to fetch notifications" },
-      { status: 500 }
+      { error: errorMessage },
+      { status: statusCode }
     );
   }
 }
@@ -59,9 +75,25 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error("Error updating notification:", error);
+
+    // Provide more specific error messages based on the error type
+    let errorMessage = "Failed to update notification";
+    let statusCode = 500;
+
+    if (error.message?.includes("ECONNREFUSED") || error.message?.includes("connection")) {
+      errorMessage = "Database connection error. Please try again later.";
+      statusCode = 503; // Service Unavailable
+    } else if (error.message?.includes("authentication") || error.message?.includes("auth")) {
+      errorMessage = "Database authentication failed.";
+      statusCode = 503;
+    } else if (error.message?.includes("timeout")) {
+      errorMessage = "Database connection timeout. Please try again.";
+      statusCode = 504; // Gateway Timeout
+    }
+
     return NextResponse.json(
-      { error: "Failed to update notification" },
-      { status: 500 }
+      { error: errorMessage },
+      { status: statusCode }
     );
   }
 }

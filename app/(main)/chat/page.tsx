@@ -43,6 +43,7 @@ import ThreadPanel from "./components/ThreadPanel";
 import { Message, Chat } from "@/types/chat";
 // @ts-ignore
 import { useCall } from "@/components/providers/CallProvider";
+import { useNavigationVisibility } from "@/lib/navigation-context";
 
 // Types moved to @/types/chat
 
@@ -81,6 +82,14 @@ export default function ChatPage() {
   // Use global call context
   const { callUser: initiateGlobalCall } = useCall();
 
+  // Navigation visibility control
+  const { setIsBottomNavHidden } = useNavigationVisibility();
+
+  // Update bottom nav visibility when chat selection changes
+  useEffect(() => {
+    setIsBottomNavHidden(!!selectedChat);
+  }, [selectedChat, setIsBottomNavHidden]);
+
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/login");
@@ -102,25 +111,82 @@ export default function ChatPage() {
     }
   }, [session?.user?.id]);
 
-  // Handle mobile keyboard layout stability
+  // Handle mobile keyboard layout stability - WhatsApp style
   useEffect(() => {
-    if (typeof window === 'undefined' || !window.visualViewport) return;
+    if (typeof window === 'undefined') return;
 
-    const handleResize = () => {
-      if (!window.visualViewport) return;
-      const chatContainer = document.getElementById('chat-container');
-      if (chatContainer && window.innerWidth < 1024) { // Only on mobile/tablet
-        chatContainer.style.height = `${window.visualViewport.height}px`;
+    const chatContainer = document.getElementById('chat-container') as HTMLElement;
+    const messagesContainer = document.querySelector('.chat-messages-container') as HTMLElement;
+
+    if (!chatContainer) return;
+
+    // WhatsApp-style keyboard handling: No transform scaling, just proper height management
+    const updateViewportHeight = () => {
+      if (window.innerWidth >= 1024) return; // Only on mobile/tablet
+
+      // Use CSS custom property to set dynamic height
+      const vh = window.innerHeight * 0.01;
+      document.documentElement.style.setProperty('--vh', `${vh}px`);
+
+      // Update container height without transform scaling
+      chatContainer.style.height = `calc(var(--vh, 1vh) * 100)`;
+      chatContainer.style.maxHeight = `calc(var(--vh, 1vh) * 100)`;
+
+      // Adjust messages container height to account for header and input
+      if (messagesContainer) {
+        const headerHeight = 64; // Approximate header height
+        const inputHeight = 80; // Approximate input height
+        const availableHeight = window.innerHeight - headerHeight - inputHeight;
+        messagesContainer.style.maxHeight = `${Math.max(availableHeight, 200)}px`;
       }
     };
 
-    window.visualViewport.addEventListener('resize', handleResize);
-    window.visualViewport.addEventListener('scroll', handleResize);
-    handleResize(); // Initial call
+    const handleOrientationChange = () => {
+      // Reset after orientation change
+      setTimeout(updateViewportHeight, 100);
+    };
+
+    // Initialize
+    updateViewportHeight();
+
+    // Listen for viewport changes (keyboard show/hide)
+    window.addEventListener('resize', updateViewportHeight);
+    window.addEventListener('orientationchange', handleOrientationChange);
+
+    // Use visualViewport for more precise detection on supported browsers
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', updateViewportHeight);
+    }
+
+    // Handle focus events for input stability
+    const handleFocusIn = () => {
+      setTimeout(updateViewportHeight, 300); // Allow time for keyboard to appear
+    };
+
+    const handleFocusOut = () => {
+      setTimeout(updateViewportHeight, 300); // Allow time for keyboard to disappear
+    };
+
+    document.addEventListener('focusin', handleFocusIn);
+    document.addEventListener('focusout', handleFocusOut);
 
     return () => {
-      window.visualViewport?.removeEventListener('resize', handleResize);
-      window.visualViewport?.removeEventListener('scroll', handleResize);
+      window.removeEventListener('resize', updateViewportHeight);
+      window.removeEventListener('orientationchange', handleOrientationChange);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', updateViewportHeight);
+      }
+      document.removeEventListener('focusin', handleFocusIn);
+      document.removeEventListener('focusout', handleFocusOut);
+
+      // Reset styles
+      if (chatContainer) {
+        chatContainer.style.height = '';
+        chatContainer.style.maxHeight = '';
+      }
+      if (messagesContainer) {
+        messagesContainer.style.maxHeight = '';
+      }
     };
   }, []);
 
@@ -1088,14 +1154,14 @@ export default function ChatPage() {
       <div className={`${selectedChat ? "hidden lg:block" : "block transition-all duration-300"}`}>
         <Navbar />
       </div>
-      <div className={`lg:pl-72 xl:pl-80 transition-all duration-300 ${selectedChat ? "pt-0 lg:pt-16" : "pt-16"}`}>
+      <div className={`lg:pl-72 xl:pl-80 transition-all duration-300 ease-in-out ${selectedChat ? "pt-0 lg:pt-16" : "pt-16"}`}>
         <div className="max-w-7xl mx-auto px-0 sm:px-4 lg:px-8 py-0 sm:py-4 lg:py-8 h-full">
           <div
             id="chat-container"
-            className={`grid grid-cols-1 lg:grid-cols-3 gap-0 sm:gap-4 lg:gap-6 ${selectedChat ? "h-[100dvh] lg:h-[calc(100vh-12rem)]" : "h-[calc(100dvh-4rem)] sm:h-[calc(100vh-8rem)] lg:h-[calc(100vh-12rem)]"}`}
+            className="mobile-chat-stable grid grid-cols-1 lg:grid-cols-3 gap-0 sm:gap-4 lg:gap-6 will-change-transform"
           >
             {/* Chat List - Enhanced Design */}
-            <Card variant="elevated" className={`lg:col-span-1 p-0 overflow-hidden flex flex-col ${selectedChat ? "hidden lg:flex" : "flex"} bg-gray-900/60 backdrop-blur-xl border-gray-800`}>
+            <Card variant="elevated" className={`lg:col-span-1 p-0 overflow-hidden flex flex-col ${selectedChat ? "hidden lg:flex" : "flex"} bg-gray-900/60 backdrop-blur-xl border-gray-800 transition-all duration-300 ease-in-out transform-gpu ${selectedChat ? "lg:translate-x-0" : "translate-x-0"}`}>
               <div className="p-4 border-b border-gray-700/50 bg-gradient-to-r from-purple-600/10 to-blue-600/10">
                 <div className="flex items-center justify-between mb-4">
                   <div>
@@ -1240,7 +1306,14 @@ export default function ChatPage() {
             {/* Chat Window - Enhanced Design */}
             <Card
               variant="elevated"
-              className={`lg:col-span-2 p-0 overflow-hidden flex flex-col ${!selectedChat ? "hidden lg:flex" : "flex"} bg-gray-900/60 backdrop-blur-xl border-gray-800`}
+              className={`lg:col-span-2 p-0 overflow-hidden flex flex-col ${!selectedChat ? "hidden lg:flex" : "flex"} bg-gray-900/60 backdrop-blur-xl border-gray-800 transition-all duration-300 ease-in-out transform-gpu`}
+              style={{
+                // WhatsApp-style fixed positioning to prevent shaking
+                position: 'relative',
+                height: '100%',
+                maxHeight: 'calc(var(--vh, 1vh) * 100)',
+                willChange: 'transform'
+              }}
             >
               {selectedChat ? (
                 <>
@@ -1326,8 +1399,13 @@ export default function ChatPage() {
 
                   {/* Messages - Enhanced */}
                   <div
-                    className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 lg:p-6 space-y-3 sm:space-y-4 bg-background/50 custom-scrollbar overscroll-contain"
-                    style={{ overflowAnchor: 'auto' }}
+                    className="chat-messages-container flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 lg:p-6 space-y-3 sm:space-y-4 bg-background/50 custom-scrollbar"
+                    style={{
+                      overflowAnchor: 'auto',
+                      height: '100%',
+                      // Dynamic height will be set by JavaScript for mobile stability
+                      minHeight: '200px'
+                    }}
                   >
                     <AnimatePresence>
                       {messages.map((message, index) => {
@@ -1468,7 +1546,7 @@ export default function ChatPage() {
                   )}
 
                   {/* Message Input - Enhanced */}
-                  <div className="p-2 sm:p-4 border-t border-gray-700/50 bg-gray-900/50">
+                  <div className="chat-input-stable p-2 sm:p-4 border-t border-gray-700/50 bg-gray-900/50">
                     <div className="flex items-center gap-2">
                       <div className="relative flex-shrink-0">
                         <Button

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useInView } from "react-intersection-observer";
@@ -93,55 +93,56 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
     }
   }, [inView, post.id]);
 
-  // Real-time socket listeners for post updates
+  // Real-time socket listeners for post updates - optimized
   useEffect(() => {
     const socket = getSocket();
     if (!socket) return;
 
+    let isMounted = true;
+
     const handleCommentAdded = (data: { postId: string; comment: any; commentsCount: number }) => {
-      if (data.postId === post.id) {
-        setComments((prev: any[]) => [...prev, data.comment]);
-        setCommentsCount(data.commentsCount);
-      }
+      if (!isMounted || data.postId !== post.id) return;
+      setComments((prev: any[]) => [...prev, data.comment]);
+      setCommentsCount(data.commentsCount);
     };
 
     const handleCommentDeleted = (data: { postId: string; commentId: string; commentsCount: number }) => {
-      if (data.postId === post.id) {
-        setComments((prev: any[]) => prev.filter(c => (c.id || c._id) !== data.commentId));
-        setCommentsCount(data.commentsCount);
-      }
+      if (!isMounted || data.postId !== post.id) return;
+      setComments((prev: any[]) => prev.filter(c => (c.id || c._id) !== data.commentId));
+      setCommentsCount(data.commentsCount);
     };
 
     const handleLikeUpdated = (data: { postId: string; likesCount: number; liked: boolean; userId: string }) => {
-      if (data.postId === post.id) {
-        setLikesCount(data.likesCount);
-        // Only update local liked state if it's not our own action
-        if (session?.user?.id !== data.userId) {
-          // Don't change our liked state based on others' actions
-        }
+      if (!isMounted || data.postId !== post.id) return;
+      setLikesCount(data.likesCount);
+      // Only update local liked state if it's not our own action
+      if (session?.user?.id !== data.userId) {
+        // Don't change our liked state based on others' actions
       }
     };
 
     const handlePollUpdate = (data: { pollId: string; voteCounts: number[]; totalVotes: number }) => {
-      if (data.pollId === post.id) {
-        setPollVotes((prev: any[]) =>
-          prev.map((opt: any, idx: number) => ({
-            ...opt,
-            votes: data.voteCounts[idx] || opt.votes
-          }))
-        );
-      }
+      if (!isMounted || data.pollId !== post.id) return;
+      setPollVotes((prev: any[]) =>
+        prev.map((opt: any, idx: number) => ({
+          ...opt,
+          votes: data.voteCounts[idx] || opt.votes
+        }))
+      );
     };
 
     // Realtime views update
     const handleViewsUpdate = (data: { postId: string; viewsCount: number }) => {
-      if (data.postId === post.id) {
-        setViewsCount(data.viewsCount);
-      }
+      if (!isMounted || data.postId !== post.id) return;
+      setViewsCount(data.viewsCount);
     };
 
-    // Join post room
-    socket.emit("join_post", post.id);
+    // Join post room with debounce to prevent multiple joins
+    const joinTimeout = setTimeout(() => {
+      if (isMounted) {
+        socket.emit("join_post", post.id);
+      }
+    }, 100);
 
     socket.on("comment_added", handleCommentAdded);
     socket.on("comment_deleted", handleCommentDeleted);
@@ -150,6 +151,8 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
     socket.on("views_updated", handleViewsUpdate);
 
     return () => {
+      isMounted = false;
+      clearTimeout(joinTimeout);
       socket.off("comment_added", handleCommentAdded);
       socket.off("comment_deleted", handleCommentDeleted);
       socket.off("like_updated", handleLikeUpdated);
@@ -159,7 +162,7 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
     };
   }, [post.id, session?.user?.id]);
 
-  const fetchComments = async () => {
+  const fetchComments = useCallback(async () => {
     setIsLoadingComments(true);
     try {
       const res = await fetch(`/api/comments?postId=${post.id}`);
@@ -172,9 +175,9 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
     } finally {
       setIsLoadingComments(false);
     }
-  };
+  }, [post.id]);
 
-  const handleLike = async () => {
+  const handleLike = useCallback(async () => {
     if (!session || isLiking) return;
     setIsLiking(true);
     const newLiked = !liked;
@@ -192,9 +195,9 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
     } finally {
       setIsLiking(false);
     }
-  };
+  }, [session, isLiking, liked, post.id]);
 
-  const handleBookmark = async () => {
+  const handleBookmark = useCallback(async () => {
     if (!session) return;
     const newBookmarked = !bookmarked;
     setBookmarked(newBookmarked);
@@ -209,7 +212,7 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
       setBookmarksCount((prev: number) => !newBookmarked ? prev + 1 : prev - 1);
       toast.error("Failed to update bookmark");
     }
-  };
+  }, [session, bookmarked, post.id]);
 
   const handlePostComment = async (content: string, parentId?: string) => {
     if (!content.trim() || isPostingComment) return;
@@ -238,7 +241,7 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
     }
   };
 
-  const handleExplainCode = async () => {
+  const handleExplainCode = useCallback(async () => {
     if (!post.codeSnippet || isExplaining) return;
     setIsExplaining(true);
     try {
@@ -260,9 +263,9 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
     } finally {
       setIsExplaining(false);
     }
-  };
+  }, [post.codeSnippet, isExplaining]);
 
-  const handleFormatCode = async () => {
+  const handleFormatCode = useCallback(async () => {
     if (!post.codeSnippet) return;
     try {
       const res = await fetch(`/api/ai/format-code`, {
@@ -282,9 +285,9 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
     } catch (error) {
       toast.error("Failed to format code");
     }
-  };
+  }, [post.codeSnippet, post.content]);
 
-  const handlePollVote = async (optionIndex: number) => {
+  const handlePollVote = useCallback(async (optionIndex: number) => {
     if (selectedPollOption) return;
     const option = pollVotes[optionIndex].option;
     setSelectedPollOption(option);
@@ -302,13 +305,21 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
     } catch (error) {
       toast.error("Failed to register vote");
     }
-  };
+  }, [selectedPollOption, pollVotes, post.id]);
 
   const totalVotes = pollVotes.reduce((acc: number, curr: any) => acc + curr.votes, 0);
 
   return (
-    <motion.div ref={viewRef} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} id={`post-${post.id}`}>
-      <Card variant="elevated" className="p-4 sm:p-6 mb-6">
+    <motion.div
+      ref={viewRef}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
+      id={`post-${post.id}`}
+      layout="preserve-aspect"
+      layoutId={`post-${post.id}`}
+    >
+      <Card variant="elevated" className="p-4 sm:p-6 mb-6 relative overflow-hidden">
         <PostHeader
           post={post}
           isOwnPost={session?.user?.id === post.userId}
@@ -357,8 +368,8 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
           bookmarksCount={bookmarksCount}
           viewsCount={viewsCount}
           onLike={handleLike}
-          onCommentToggle={() => setShowComments(!showComments)}
-          onShare={() => toast.success("Link copied to clipboard!")}
+          onCommentToggle={useCallback(() => setShowComments(!showComments), [showComments])}
+          onShare={useCallback(() => toast.success("Link copied to clipboard!"), [])}
           onBookmark={handleBookmark}
           onExplain={handleExplainCode}
           hasCode={!!post.codeSnippet}

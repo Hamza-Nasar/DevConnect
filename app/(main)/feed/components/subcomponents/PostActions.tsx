@@ -96,13 +96,22 @@ export default function PostActions({
 function ActionButton({ icon: Icon, count, active, activeColor, onClick }: any) {
     return (
         <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             onClick={onClick}
-            className={`flex items-center gap-2 transition-colors ${active ? activeColor : "text-gray-400 hover:text-white"}`}
+            className={`flex items-center gap-2 transition-colors duration-200 ${active ? activeColor : "text-gray-400 hover:text-white"}`}
+            layout="preserve-aspect"
         >
             <Icon className={`h-5 w-5 ${active ? "fill-current" : ""}`} />
-            <span className="text-sm font-medium">{formatNumber(count)}</span>
+            <motion.span
+                key={count}
+                initial={{ scale: 0.8, opacity: 0.7 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ duration: 0.2 }}
+                className="text-sm font-medium tabular-nums min-w-[20px] text-center"
+            >
+                {formatNumber(count)}
+            </motion.span>
         </motion.button>
     );
 }

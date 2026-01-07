@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getCollection } from "@/lib/mongodb";
-import { toObjectId } from "@/lib/db";
+import { toObjectId, COLLECTIONS } from "@/lib/db";
 
 export async function DELETE(
   req: NextRequest,
@@ -19,8 +19,8 @@ export async function DELETE(
     if (!idObj) {
       return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
     }
-    const groupsCollection = await getCollection("groups");
-    const groupMembersCollection = await getCollection("groupMembers");
+    const groupsCollection = await getCollection(COLLECTIONS.GROUPS);
+    const groupMembersCollection = await getCollection(COLLECTIONS.GROUP_MEMBERS);
 
     const group = await groupsCollection.findOne({ _id: idObj });
     if (!group) {
@@ -46,6 +46,14 @@ export async function DELETE(
       { _id: idObj },
       { $inc: { membersCount: -1 } }
     );
+
+    // Emit real-time event for group member left
+    const { emitToRoom } = await import("@/lib/socket-server");
+    emitToRoom(`group:${id}`, "group_member_left", {
+      groupId: id,
+      memberId: session.user.id,
+      membersCount: group.membersCount - 1
+    });
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

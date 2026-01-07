@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getCollection } from "@/lib/mongodb";
+import { COLLECTIONS } from "@/lib/db";
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,7 +21,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const membersCollection = await getCollection("groupMembers");
+    const membersCollection = await getCollection(COLLECTIONS.GROUP_MEMBERS);
     const groupsCollection = await getCollection("groups");
 
     // Check if already a member
