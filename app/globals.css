@@ -173,7 +173,7 @@
   /* Grid layout (no chat selected) */
   .chat-list-card {
     /* Chat list should be narrower in grid */
-    max-width: 350px;
+    max-width: 320px;
   }
 
   .chat-window-card {
@@ -232,7 +232,7 @@
     .chat-list-card {
       /* Optimized sidebar width for extra large screens */
       width: 100%;
-      max-width: 360px;
+      max-width: 320px;
     }
 
     .chat-window-card {

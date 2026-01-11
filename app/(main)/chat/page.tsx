@@ -1330,7 +1330,7 @@ export default function ChatPage() {
             }}
           >
             {/* Chat List - Enhanced Design */}
-            <Card variant="elevated" className="p-0 overflow-hidden flex flex-col bg-gray-900/60 backdrop-blur-xl border-gray-800 transition-all duration-300 ease-in-out transform-gpu chat-list-card w-full lg:w-80 xl:w-96 flex-shrink-0">
+            <Card variant="elevated" className={`p-0 overflow-hidden flex flex-col bg-gray-900/60 backdrop-blur-xl border-gray-800 transition-all duration-300 ease-in-out transform-gpu chat-list-card w-full lg:w-80 xl:w-96 flex-shrink-0 ${selectedChat ? "hidden lg:flex" : "flex"}`}>
               <div className="p-4 border-b border-gray-700/50 bg-gradient-to-r from-purple-600/10 to-blue-600/10">
                 <div className="flex items-center justify-between mb-4">
                   <div>
