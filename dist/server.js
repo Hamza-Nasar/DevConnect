@@ -1,0 +1,43 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+require("dotenv/config");
+const http_1 = require("http");
+const url_1 = require("url");
+const next_1 = __importDefault(require("next"));
+const index_1 = require("./server/index");
+const dev = process.env.NODE_ENV !== "production";
+const port = parseInt(process.env.PORT || "3000", 10);
+console.log("🚀 Starting server...");
+console.log(`📦 Environment: ${process.env.NODE_ENV || "development"}`);
+console.log(`🔌 Port: ${port}`);
+const app = (0, next_1.default)({ dev });
+const handle = app.getRequestHandler();
+app.prepare().then(() => {
+    const httpServer = (0, http_1.createServer)(async (req, res) => {
+        var _a, _b;
+        try {
+            if (((_a = req.url) === null || _a === void 0 ? void 0 : _a.startsWith("/socket.io")) ||
+                ((_b = req.url) === null || _b === void 0 ? void 0 : _b.startsWith("/socket.io-custom"))) {
+                return;
+            }
+            const parsedUrl = (0, url_1.parse)(req.url, true);
+            await handle(req, res, parsedUrl);
+        }
+        catch (err) {
+            console.error("❌ Error handling request:", err);
+            res.statusCode = 500;
+            res.end("Internal Server Error");
+        }
+    });
+    const io = (0, index_1.initializeSocket)(httpServer);
+    io.engine.on("connection_error", (err) => {
+        console.error("❌ Socket.io error:", err);
+    });
+    httpServer.listen(port, () => {
+        console.log(`✅ Server ready on port ${port}`);
+        console.log(`✅ WebSocket initialized`);
+    });
+});

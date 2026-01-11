@@ -6,13 +6,14 @@
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "baseUrl": ".",
+    "outDir": "./dist",
     "paths": {
       "@/*": [
         "./*"
       ]
     },
-    "allowImportingTsExtensions": true,
-    "noEmit": true
+    "allowImportingTsExtensions": false,
+    "noEmit": false
   },
   "include": [
     "server.ts",
