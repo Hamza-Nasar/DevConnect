@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
+import { getSocketHealth } from "@/lib/socket-server";
 
 /**
  * Health Check API Endpoint
@@ -14,7 +15,7 @@ export async function GET() {
     // Check database connectivity
     let dbStatus = "unknown";
     let dbLatency = 0;
-    
+
     try {
       const dbStart = Date.now();
       const db = await getDb();
@@ -26,8 +27,11 @@ export async function GET() {
       console.error("Health check - DB error:", dbError);
     }
 
+    // Check WebSocket health
+    const socketHealth = getSocketHealth();
+
     const response = {
-      status: dbStatus === "connected" ? "healthy" : "degraded",
+      status: (dbStatus === "connected" && socketHealth.status === "connected") ? "healthy" : "degraded",
       timestamp: new Date().toISOString(),
       environment: process.env.NODE_ENV || "development",
       version: process.env.npm_package_version || "1.0.0",
@@ -37,6 +41,12 @@ export async function GET() {
         database: {
           status: dbStatus,
           latency: dbLatency,
+        },
+        websocket: {
+          status: socketHealth.status,
+          connections: socketHealth.connections,
+          rooms: socketHealth.rooms,
+          uptime: socketHealth.uptime,
         },
         server: {
           status: "running",
@@ -51,7 +61,7 @@ export async function GET() {
 
     // Return 200 for healthy, 503 for degraded
     return NextResponse.json(response, {
-      status: dbStatus === "connected" ? 200 : 503,
+      status: (dbStatus === "connected" && socketHealth.status === "connected") ? 200 : 503,
       headers: {
         "Cache-Control": "no-cache, no-store, must-revalidate",
       },

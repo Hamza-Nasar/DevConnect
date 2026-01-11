@@ -42,10 +42,13 @@ export function initializeSocket(server: HTTPServer) {
     },
     path: "/socket.io-custom",
     addTrailingSlash: true,
-    transports: ["websocket", "polling"], // WebSocket first for better performance
+    transports: ["polling", "websocket"], // Try polling first for Railway compatibility
     allowEIO3: true,
-    pingTimeout: 60000,
-    pingInterval: 25000,
+    pingTimeout: 30000, // Reduced timeout for better Railway compatibility
+    pingInterval: 15000, // More frequent pings
+    connectTimeout: 20000, // Connection timeout
+    maxHttpBufferSize: 1e8, // 100MB for large data
+    cookie: false, // Disable cookies for Railway
   });
 
   // Make socket instance globally accessible
@@ -131,6 +134,25 @@ export function initializeSocket(server: HTTPServer) {
   };
 
   console.log("🚀 Socket.IO Server Initialized");
+  console.log("📊 Socket.IO Configuration:", {
+    path: "/socket.io-custom",
+    transports: ["polling", "websocket"],
+    pingTimeout: 30000,
+    pingInterval: 15000,
+    cors: getAllowedOrigins() === true ? "all origins" : getAllowedOrigins()
+  });
+
+  // Add health check for WebSocket connections
+  io.on("connection", (socket) => {
+    console.log(`🔌 [Health] New connection: ${socket.id}`);
+
+    // Send immediate health check
+    socket.emit("health_check", { status: "ok", timestamp: Date.now() });
+
+    socket.on("health_check_response", (data) => {
+      console.log(`💚 [Health] Client ${socket.id} responded:`, data);
+    });
+  });
 
   io.on("connection", (socket: CustomSocket) => {
     console.log(`🔌 [Server] New connection: ${socket.id}`);

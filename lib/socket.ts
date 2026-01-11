@@ -37,42 +37,46 @@ export const getSocket = (): CustomSocket | null => {
       console.log("🚂 [Client] Detected Railway deployment. WebSockets should be fully supported.");
     }
 
-    console.log("🔌 [Client] Initializing Socket...", { 
-      url: socketUrl, 
+    console.log("🔌 [Client] Initializing Socket...", {
+      url: socketUrl,
       path: "/socket.io-custom",
       isProduction,
       isVercel,
-      isRailway 
+      isRailway,
+      timestamp: new Date().toISOString()
     });
 
     socket = io(socketUrl, {
       path: "/socket.io-custom",
-      transports: ["websocket", "polling"], // Try websocket first for better performance
+      transports: ["polling", "websocket"], // Try polling first for Railway compatibility
       reconnection: true,
-      reconnectionAttempts: Infinity,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      timeout: 20000,
-      withCredentials: true,
+      reconnectionAttempts: 10, // Limit reconnection attempts
+      reconnectionDelay: 2000,
+      reconnectionDelayMax: 10000,
+      timeout: 15000, // Reduced timeout to match server
+      withCredentials: false, // Disable credentials for Railway
       autoConnect: true,
       forceNew: true,
-      // Add upgrade timeout for better WebSocket handling
-      upgrade: true,
-      rememberUpgrade: true,
+      upgrade: false, // Disable upgrade for Railway stability
+      rememberUpgrade: false,
     }) as CustomSocket;
 
-    // Diagnostics for Vercel debugging
-    if (typeof window !== "undefined") {
-      (window as any).SOCKET_DEBUG = {
-        socket,
-        config: { socketUrl, path: "/socket.io-custom" },
-        getStatus: () => ({
-          connected: socket?.connected,
-          id: socket?.id,
-          transport: (socket as any).io?.engine?.transport?.name
-        })
-      };
-    }
+  // Diagnostics for debugging
+  if (typeof window !== "undefined") {
+    (window as any).SOCKET_DEBUG = {
+      socket,
+      config: { socketUrl, path: "/socket.io-custom" },
+      getStatus: () => ({
+        connected: socket?.connected,
+        id: socket?.id,
+        transport: (socket as any).io?.engine?.transport?.name,
+        readyState: (socket as any).io?.engine?.readyState
+      }),
+      testConnection,
+      reconnect: reconnectSocket,
+      disconnect: disconnectSocket
+    };
+  }
 
     let heartbeatInterval: NodeJS.Timeout;
 
@@ -142,6 +146,30 @@ export const disconnectSocket = () => {
     socket.disconnect();
     socket = null;
   }
+};
+
+export const testConnection = () => {
+  console.log("🧪 [Client] Testing WebSocket connection...");
+
+  if (!socket) {
+    console.log("❌ [Client] No socket instance found");
+    return false;
+  }
+
+  console.log("📊 [Client] Connection status:", {
+    connected: socket.connected,
+    id: socket.id,
+    transport: (socket as any).io?.engine?.transport?.name,
+    readyState: (socket as any).io?.engine?.readyState
+  });
+
+  // Send a test ping
+  socket.emit("ping_heartbeat");
+  socket.once("pong_heartbeat", () => {
+    console.log("✅ [Client] Ping-pong test successful");
+  });
+
+  return socket.connected;
 };
 
 export default getSocket;

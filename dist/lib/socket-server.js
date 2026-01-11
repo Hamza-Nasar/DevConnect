@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.emitToRoom = exports.getSocketInstance = exports.setSocketInstance = void 0;
+exports.getSocketHealth = exports.emitToRoom = exports.getSocketInstance = exports.setSocketInstance = void 0;
 const setSocketInstance = (io) => {
     global._ioInstance = io;
 };
@@ -20,3 +20,21 @@ const emitToRoom = (room, event, data) => {
     }
 };
 exports.emitToRoom = emitToRoom;
+const getSocketHealth = () => {
+    const io = (0, exports.getSocketInstance)();
+    if (!io) {
+        return {
+            status: "disconnected",
+            connections: 0,
+            rooms: 0,
+            uptime: 0,
+        };
+    }
+    return {
+        status: "connected",
+        connections: io.sockets.sockets.size,
+        rooms: io.sockets.adapter.rooms.size,
+        uptime: process.uptime(),
+    };
+};
+exports.getSocketHealth = getSocketHealth;

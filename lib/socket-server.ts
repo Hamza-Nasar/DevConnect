@@ -23,6 +23,25 @@ export const emitToRoom = (room: string, event: string, data: any) => {
   }
 };
 
+export const getSocketHealth = () => {
+  const io = getSocketInstance();
+  if (!io) {
+    return {
+      status: "disconnected",
+      connections: 0,
+      rooms: 0,
+      uptime: 0,
+    };
+  }
+
+  return {
+    status: "connected",
+    connections: io.sockets.sockets.size,
+    rooms: io.sockets.adapter.rooms.size,
+    uptime: process.uptime(),
+  };
+};
+
 
 
 
