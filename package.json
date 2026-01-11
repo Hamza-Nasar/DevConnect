@@ -4,10 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "ts-node --project tsconfig.server.json --transpile-only server.ts",
-    "build": "next build",
-    "start": "NODE_ENV=production ts-node --project tsconfig.server.json --transpile-only server.ts",
-    "lint": "eslint",
-    "db:separate": "node scripts/separate-collections.js"
+    "build": "next build && tsc --project tsconfig.server.json",
+    "start": "NODE_ENV=production node dist/server.js",
+    "lint": "next lint"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",

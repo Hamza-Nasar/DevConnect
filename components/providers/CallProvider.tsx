@@ -57,13 +57,13 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
     // Initialize sounds
     useEffect(() => {
         if (typeof window === "undefined" || !window?.document) return;
-        const ringtone = new Audio("https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3");
-        ringtone.loop = true;
-        ringtoneRef.current = ringtone;
 
-        const callingSound = new Audio("https://assets.mixkit.co/active_storage/sfx/2361/2361-preview.mp3");
-        callingSound.loop = true;
-        callingSoundRef.current = callingSound;
+        // Get user incoming ringtone preference from localStorage
+        const userRingtone = localStorage.getItem("user_ringtone") || "normal-ring";
+
+        // Use generated tones for both incoming and outgoing
+        ringtoneRef.current = null; // Will use generated tones
+        callingSoundRef.current = null; // Will use generated tones
     }, []);
 
     useEffect(() => {
@@ -107,25 +107,103 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
         };
     }, [session?.user?.id]);
 
+    // Tone generation functions
+    const generateTone = (frequency: number, duration: number, type: OscillatorType = 'sine') => {
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
+        oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+        oscillator.type = type;
+
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + duration);
+
+        return audioContext;
+    };
+
+    const playIncomingRingtone = () => {
+        const userRingtone = localStorage.getItem("user_ringtone") || "normal-ring";
+
+        switch (userRingtone) {
+            case 'normal-ring':
+                setTimeout(() => generateTone(800, 0.5), 0);
+                setTimeout(() => generateTone(800, 0.5), 600);
+                setTimeout(() => generateTone(800, 0.5), 1200);
+                setTimeout(() => generateTone(800, 0.5), 1800);
+                break;
+            case 'crystal-bell':
+                generateTone(1046, 0.8, 'sine');
+                setTimeout(() => generateTone(1318, 0.8, 'sine'), 300);
+                break;
+            case 'gentle-bell':
+                generateTone(523, 1, 'triangle');
+                setTimeout(() => generateTone(659, 1, 'triangle'), 200);
+                break;
+            default:
+                // Default to normal ring
+                setTimeout(() => generateTone(800, 0.5), 0);
+                setTimeout(() => generateTone(800, 0.5), 600);
+        }
+    };
+
+    const playOutgoingTone = () => {
+        // Simple smooth connecting tone
+        let interval = setInterval(() => {
+            generateTone(440, 0.15, 'sine');
+        }, 300);
+        return interval;
+    };
+
     // Sound management
     useEffect(() => {
         if (typeof window === "undefined") return;
 
+        let outgoingInterval: NodeJS.Timeout | null = null;
+
         // Incoming Call Ringtone
         if (incomingCall && !callAccepted && !callEnded) {
-            ringtoneRef.current?.play().catch(console.error);
+            // Play ringtone every 2 seconds
+            const ringInterval = setInterval(() => {
+                playIncomingRingtone();
+            }, 2000);
+
+            // Store interval for cleanup
+            (window as any).ringInterval = ringInterval;
         } else {
-            ringtoneRef.current?.pause();
-            if (ringtoneRef.current) ringtoneRef.current.currentTime = 0;
+            // Stop incoming ringtone
+            if ((window as any).ringInterval) {
+                clearInterval((window as any).ringInterval);
+                (window as any).ringInterval = null;
+            }
         }
 
         // Outgoing Call Sound
         if (outgoingCall && !callAccepted && !callEnded) {
-            callingSoundRef.current?.play().catch(console.error);
+            outgoingInterval = playOutgoingTone();
+            (window as any).outgoingInterval = outgoingInterval;
         } else {
-            callingSoundRef.current?.pause();
-            if (callingSoundRef.current) callingSoundRef.current.currentTime = 0;
+            // Stop outgoing tone
+            if ((window as any).outgoingInterval) {
+                clearInterval((window as any).outgoingInterval);
+                (window as any).outgoingInterval = null;
+            }
         }
+
+        return () => {
+            if ((window as any).ringInterval) {
+                clearInterval((window as any).ringInterval);
+            }
+            if ((window as any).outgoingInterval) {
+                clearInterval((window as any).outgoingInterval);
+            }
+        };
     }, [incomingCall, outgoingCall, callAccepted, callEnded]);
 
     const callUser = async (userId: string, userName: string, userAvatar: string, isVideo: boolean) => {

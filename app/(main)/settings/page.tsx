@@ -22,6 +22,10 @@ import {
   Moon,
   Flag,
   Zap,
+  Volume2,
+  Upload,
+  Play,
+  Pause,
 } from "lucide-react";
 import Navbar from "@/components/navbar/Navbar";
 import { Card } from "@/components/ui/card";
@@ -36,6 +40,7 @@ import { motion } from "framer-motion";
 import toast from "react-hot-toast";
 import { useRef } from "react";
 import getSocket from "@/lib/socket";
+import { playToneByType } from "@/lib/soundUtils";
 import Link from "next/link";
 
 export default function SettingsPage() {
@@ -89,6 +94,17 @@ export default function SettingsPage() {
   // Theme Settings
   const [theme, setTheme] = useState<"light" | "dark">("dark");
 
+  // Sound Settings
+  const [soundSettings, setSoundSettings] = useState({
+    incomingRingtone: "/sounds/ringtone.mp3",
+    notificationTone: "gentle-bell",
+    messageTone: "quick-beep",
+    customRingtones: [] as string[],
+  });
+  const [playingSound, setPlayingSound] = useState<string | null>(null);
+  const [uploadingRingtone, setUploadingRingtone] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/login");
@@ -105,6 +121,19 @@ export default function SettingsPage() {
     const initialTheme = savedTheme || (prefersDark ? "dark" : "light");
     setTheme(initialTheme);
     applyTheme(initialTheme);
+
+    // Load sound settings
+    const savedIncomingRingtone = localStorage.getItem("user_ringtone") || "/sounds/ringtone.mp3";
+    const savedNotificationTone = localStorage.getItem("notification_tone") || "gentle-bell";
+    const savedMessageTone = localStorage.getItem("message_tone") || "quick-beep";
+    const savedCustomRingtones = JSON.parse(localStorage.getItem("custom_ringtones") || "[]");
+
+    setSoundSettings({
+      incomingRingtone: savedIncomingRingtone,
+      notificationTone: savedNotificationTone,
+      messageTone: savedMessageTone,
+      customRingtones: savedCustomRingtones,
+    });
   }, [session]);
 
   const applyTheme = (newTheme: "light" | "dark") => {
@@ -418,6 +447,130 @@ export default function SettingsPage() {
     }
   };
 
+  // Sound Settings Functions
+  const playTone = (toneType: string) => {
+    if (playingSound === toneType) {
+      setPlayingSound(null);
+      return;
+    }
+
+    setPlayingSound(toneType);
+    playToneByType(toneType);
+
+    // Set timeout to stop playing indicator
+    setTimeout(() => setPlayingSound(null), 2500);
+  };
+
+  const playSound = (soundUrl: string) => {
+    if (playingSound === soundUrl) {
+      // Stop playing
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }
+      setPlayingSound(null);
+      return;
+    }
+
+    // Stop any currently playing sound
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+
+    // Try to play the audio file first
+    const audio = new Audio(soundUrl);
+    audio.loop = true; // Loop for preview
+    audio.volume = 0.5; // Lower volume for preview
+
+    audio.onended = () => {
+      setPlayingSound(null);
+    };
+
+    audio.play().then(() => {
+      audioRef.current = audio;
+      setPlayingSound(soundUrl);
+    }).catch(() => {
+      // If audio file fails to load, use generated tone
+      console.log('Audio file not found, using generated tone');
+      if (soundUrl.includes('ringtone.mp3')) {
+        playTone('normal-ring');
+      } else {
+        playTone('whatsapp-connecting');
+      }
+    });
+  };
+
+  const handleToneChange = (type: "incoming" | "notification" | "message", value: string) => {
+    setSoundSettings(prev => ({
+      ...prev,
+      [type === "incoming" ? "incomingRingtone" : type === "notification" ? "notificationTone" : "messageTone"]: value
+    }));
+  };
+
+  const handleCustomRingtoneUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith("audio/")) {
+      toast.error("Please select an audio file");
+      return;
+    }
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Audio file size must be less than 5MB");
+      return;
+    }
+
+    setUploadingRingtone(true);
+
+    try {
+      // Convert to base64
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const base64Audio = e.target?.result as string;
+
+        // Save to localStorage for now (in production, you'd upload to server)
+        const customRingtones = [...soundSettings.customRingtones, base64Audio];
+        localStorage.setItem("custom_ringtones", JSON.stringify(customRingtones));
+
+        setSoundSettings(prev => ({
+          ...prev,
+          customRingtones: customRingtones
+        }));
+
+        toast.success("Custom ringtone uploaded successfully!");
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error("Error uploading ringtone:", error);
+      toast.error("Failed to upload ringtone");
+    } finally {
+      setUploadingRingtone(false);
+    }
+  };
+
+  const handleSaveSoundSettings = () => {
+    // Save to localStorage
+    localStorage.setItem("user_ringtone", soundSettings.incomingRingtone);
+    localStorage.setItem("notification_tone", soundSettings.notificationTone);
+    localStorage.setItem("message_tone", soundSettings.messageTone);
+    localStorage.setItem("custom_ringtones", JSON.stringify(soundSettings.customRingtones));
+
+    toast.success("Sound settings saved successfully!");
+  };
+
+  const removeCustomRingtone = (index: number) => {
+    const updatedRingtones = soundSettings.customRingtones.filter((_, i) => i !== index);
+    setSoundSettings(prev => ({
+      ...prev,
+      customRingtones: updatedRingtones
+    }));
+    localStorage.setItem("custom_ringtones", JSON.stringify(updatedRingtones));
+  };
+
   if (status === "loading") {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -467,6 +620,11 @@ export default function SettingsPage() {
                 <Palette className="h-4 w-4 flex-shrink-0" />
                 <span className="hidden sm:inline">Appearance</span>
                 <span className="sm:hidden">Theme</span>
+              </TabsTrigger>
+              <TabsTrigger value="sounds" className="flex-shrink-0 flex items-center gap-1.5 px-3 sm:px-4 py-2.5 text-xs sm:text-sm min-w-[80px] sm:min-w-0 whitespace-nowrap">
+                <Volume2 className="h-4 w-4 flex-shrink-0" />
+                <span className="hidden sm:inline">Sounds</span>
+                <span className="sm:hidden">Audio</span>
               </TabsTrigger>
             </TabsList>
 
@@ -1042,6 +1200,635 @@ export default function SettingsPage() {
                       Your theme preference is saved locally and will persist across sessions.
                     </p>
                   </div>
+                </div>
+              </Card>
+            </TabsContent>
+
+            {/* Sounds Tab */}
+            <TabsContent value="sounds" className="mt-6">
+              <Card variant="elevated" className="p-6">
+                <h3 className="text-xl font-bold text-foreground mb-6">Sound Settings</h3>
+                <div className="space-y-8">
+                  {/* Incoming Call Ringtone */}
+                  <div>
+                    <h4 className="font-semibold text-foreground mb-4">Incoming Call Ringtone</h4>
+                    <div className="grid grid-cols-1 gap-3">
+                      {/* Ringtone 1 */}
+                      <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <Volume2 className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="text-foreground font-medium">Classic Ring</p>
+                            <p className="text-sm text-muted-foreground">Traditional telephone ring</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => playToneByType('normal-ring')}
+                            disabled={playingSound === 'normal-ring'}
+                          >
+                            {playingSound === 'normal-ring' ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                          </Button>
+                          <input
+                            type="radio"
+                            name="incoming-ringtone"
+                            value="normal-ring"
+                            checked={soundSettings.incomingRingtone === "normal-ring"}
+                            onChange={(e) => handleToneChange("incoming", e.target.value)}
+                            className="w-4 h-4 text-primary"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Ringtone 2 */}
+                      <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <Volume2 className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="text-foreground font-medium">Crystal Bell</p>
+                            <p className="text-sm text-muted-foreground">Elegant crystal bell</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => playTone('crystal-bell')}
+                            disabled={playingSound === 'crystal-bell'}
+                          >
+                            {playingSound === 'crystal-bell' ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                          </Button>
+                          <input
+                            type="radio"
+                            name="incoming-ringtone"
+                            value="crystal-bell"
+                            checked={soundSettings.incomingRingtone === "crystal-bell"}
+                            onChange={(e) => handleToneChange("incoming", e.target.value)}
+                            className="w-4 h-4 text-primary"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Ringtone 3 */}
+                      <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <Volume2 className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="text-foreground font-medium">Melody Chime</p>
+                            <p className="text-sm text-muted-foreground">Musical chime melody</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => playTone('melody-chime')}
+                            disabled={playingSound === 'melody-chime'}
+                          >
+                            {playingSound === 'melody-chime' ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                          </Button>
+                          <input
+                            type="radio"
+                            name="incoming-ringtone"
+                            value="melody-chime"
+                            checked={soundSettings.incomingRingtone === "melody-chime"}
+                            onChange={(e) => handleToneChange("incoming", e.target.value)}
+                            className="w-4 h-4 text-primary"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Ringtone 4 */}
+                      <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <Volume2 className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="text-foreground font-medium">Gentle Bell</p>
+                            <p className="text-sm text-muted-foreground">Soft gentle bell</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => playTone('gentle-bell')}
+                            disabled={playingSound === 'gentle-bell'}
+                          >
+                            {playingSound === 'gentle-bell' ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                          </Button>
+                          <input
+                            type="radio"
+                            name="incoming-ringtone"
+                            value="gentle-bell"
+                            checked={soundSettings.incomingRingtone === "gentle-bell"}
+                            onChange={(e) => handleToneChange("incoming", e.target.value)}
+                            className="w-4 h-4 text-primary"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Ringtone 5 */}
+                      <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <Volume2 className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="text-foreground font-medium">🌟 Digital Pulse</p>
+                            <p className="text-sm text-muted-foreground">Modern digital pulse</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => playTone('digital-pulse')}
+                            disabled={playingSound === 'digital-pulse'}
+                          >
+                            {playingSound === 'digital-pulse' ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                          </Button>
+                          <input
+                            type="radio"
+                            name="incoming-ringtone"
+                            value="digital-pulse"
+                            checked={soundSettings.incomingRingtone === "digital-pulse"}
+                            onChange={(e) => handleToneChange("incoming", e.target.value)}
+                            className="w-4 h-4 text-primary"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Ringtone 6 */}
+                      <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <Volume2 className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="text-foreground font-medium">Piano Note</p>
+                            <p className="text-sm text-muted-foreground">Elegant piano melody</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => playTone('piano-note')}
+                            disabled={playingSound === 'piano-note'}
+                          >
+                            {playingSound === 'piano-note' ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                          </Button>
+                          <input
+                            type="radio"
+                            name="incoming-ringtone"
+                            value="piano-note"
+                            checked={soundSettings.incomingRingtone === "piano-note"}
+                            onChange={(e) => handleToneChange("incoming", e.target.value)}
+                            className="w-4 h-4 text-primary"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Ringtone 7 */}
+                      <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <Volume2 className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="text-foreground font-medium">Quick Beep</p>
+                            <p className="text-sm text-muted-foreground">Fast notification beep</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => playTone('quick-beep')}
+                            disabled={playingSound === 'quick-beep'}
+                          >
+                            {playingSound === 'quick-beep' ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                          </Button>
+                          <input
+                            type="radio"
+                            name="incoming-ringtone"
+                            value="quick-beep"
+                            checked={soundSettings.incomingRingtone === "quick-beep"}
+                            onChange={(e) => handleToneChange("incoming", e.target.value)}
+                            className="w-4 h-4 text-primary"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Ringtone 8 */}
+                      <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <Volume2 className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="text-foreground font-medium">Nature Chime</p>
+                            <p className="text-sm text-muted-foreground">Peaceful nature sound</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => playTone('nature-chime')}
+                            disabled={playingSound === 'nature-chime'}
+                          >
+                            {playingSound === 'nature-chime' ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                          </Button>
+                          <input
+                            type="radio"
+                            name="incoming-ringtone"
+                            value="nature-chime"
+                            checked={soundSettings.incomingRingtone === "nature-chime"}
+                            onChange={(e) => handleToneChange("incoming", e.target.value)}
+                            className="w-4 h-4 text-primary"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Ringtone 9 */}
+                      <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <Volume2 className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="text-foreground font-medium">Trumpet Call</p>
+                            <p className="text-sm text-muted-foreground">Classic trumpet fanfare</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => playTone('trumpet-call')}
+                            disabled={playingSound === 'trumpet-call'}
+                          >
+                            {playingSound === 'trumpet-call' ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                          </Button>
+                          <input
+                            type="radio"
+                            name="incoming-ringtone"
+                            value="trumpet-call"
+                            checked={soundSettings.incomingRingtone === "trumpet-call"}
+                            onChange={(e) => handleToneChange("incoming", e.target.value)}
+                            className="w-4 h-4 text-primary"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Ringtone 10 */}
+                      <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <Volume2 className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="text-foreground font-medium">Orchestra Hit</p>
+                            <p className="text-sm text-muted-foreground">Dramatic orchestra sting</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => playTone('orchestra-hit')}
+                            disabled={playingSound === 'orchestra-hit'}
+                          >
+                            {playingSound === 'orchestra-hit' ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                          </Button>
+                          <input
+                            type="radio"
+                            name="incoming-ringtone"
+                            value="orchestra-hit"
+                            checked={soundSettings.incomingRingtone === "orchestra-hit"}
+                            onChange={(e) => handleToneChange("incoming", e.target.value)}
+                            className="w-4 h-4 text-primary"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Custom Ringtones */}
+                      {soundSettings.customRingtones.map((ringtone, index) => (
+                        <div key={index} className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
+                          <div className="flex items-center gap-3">
+                            <Volume2 className="h-5 w-5 text-muted-foreground" />
+                            <div>
+                              <p className="text-foreground font-medium">Custom Ringtone {index + 1}</p>
+                              <p className="text-sm text-muted-foreground">Uploaded by you</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => playSound(ringtone)}
+                              disabled={playingSound === ringtone}
+                            >
+                              {playingSound === ringtone ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                            </Button>
+                            <input
+                              type="radio"
+                              name="incoming-ringtone"
+                              value={ringtone}
+                              checked={soundSettings.incomingRingtone === ringtone}
+                              onChange={(e) => handleToneChange("incoming", e.target.value)}
+                              className="w-4 h-4 text-primary"
+                            />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeCustomRingtone(index)}
+                              className="text-destructive hover:text-destructive/80"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+
+                  {/* Notification Tone */}
+                  <div>
+                    <h4 className="font-semibold text-foreground mb-4">Notification Tone</h4>
+                    <div className="grid grid-cols-1 gap-3">
+                      {/* Notification Tone Options */}
+                      <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <Volume2 className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="text-foreground font-medium">Gentle Bell</p>
+                            <p className="text-sm text-muted-foreground">Soft notification bell</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => playTone('gentle-bell')}
+                            disabled={playingSound === 'gentle-bell'}
+                          >
+                            {playingSound === 'gentle-bell' ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                          </Button>
+                          <input
+                            type="radio"
+                            name="notification-tone"
+                            value="gentle-bell"
+                            checked={soundSettings.notificationTone === "gentle-bell"}
+                            onChange={(e) => handleToneChange("notification", e.target.value)}
+                            className="w-4 h-4 text-primary"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <Volume2 className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="text-foreground font-medium">Quick Beep</p>
+                            <p className="text-sm text-muted-foreground">Fast notification beep</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => playTone('quick-beep')}
+                            disabled={playingSound === 'quick-beep'}
+                          >
+                            {playingSound === 'quick-beep' ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                          </Button>
+                          <input
+                            type="radio"
+                            name="notification-tone"
+                            value="quick-beep"
+                            checked={soundSettings.notificationTone === "quick-beep"}
+                            onChange={(e) => handleToneChange("notification", e.target.value)}
+                            className="w-4 h-4 text-primary"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <Volume2 className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="text-foreground font-medium">Crystal Bell</p>
+                            <p className="text-sm text-muted-foreground">Elegant crystal tone</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => playTone('crystal-bell')}
+                            disabled={playingSound === 'crystal-bell'}
+                          >
+                            {playingSound === 'crystal-bell' ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                          </Button>
+                          <input
+                            type="radio"
+                            name="notification-tone"
+                            value="crystal-bell"
+                            checked={soundSettings.notificationTone === "crystal-bell"}
+                            onChange={(e) => handleToneChange("notification", e.target.value)}
+                            className="w-4 h-4 text-primary"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <Volume2 className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="text-foreground font-medium">🌟 Digital Pulse</p>
+                            <p className="text-sm text-muted-foreground">Modern digital pulse</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => playTone('digital-pulse')}
+                            disabled={playingSound === 'digital-pulse'}
+                          >
+                            {playingSound === 'digital-pulse' ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                          </Button>
+                          <input
+                            type="radio"
+                            name="notification-tone"
+                            value="digital-pulse"
+                            checked={soundSettings.notificationTone === "digital-pulse"}
+                            onChange={(e) => handleToneChange("notification", e.target.value)}
+                            className="w-4 h-4 text-primary"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Message Tone */}
+                  <div>
+                    <h4 className="font-semibold text-foreground mb-4">Message Tone</h4>
+                    <div className="grid grid-cols-1 gap-3">
+                      {/* Message Tone Options */}
+                      <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <Volume2 className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="text-foreground font-medium">Quick Beep</p>
+                            <p className="text-sm text-muted-foreground">Fast message notification</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => playTone('quick-beep')}
+                            disabled={playingSound === 'quick-beep'}
+                          >
+                            {playingSound === 'quick-beep' ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                          </Button>
+                          <input
+                            type="radio"
+                            name="message-tone"
+                            value="quick-beep"
+                            checked={soundSettings.messageTone === "quick-beep"}
+                            onChange={(e) => handleToneChange("message", e.target.value)}
+                            className="w-4 h-4 text-primary"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <Volume2 className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="text-foreground font-medium">Melody Chime</p>
+                            <p className="text-sm text-muted-foreground">Musical message tone</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => playTone('melody-chime')}
+                            disabled={playingSound === 'melody-chime'}
+                          >
+                            {playingSound === 'melody-chime' ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                          </Button>
+                          <input
+                            type="radio"
+                            name="message-tone"
+                            value="melody-chime"
+                            checked={soundSettings.messageTone === "melody-chime"}
+                            onChange={(e) => handleToneChange("message", e.target.value)}
+                            className="w-4 h-4 text-primary"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <Volume2 className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="text-foreground font-medium">Gentle Bell</p>
+                            <p className="text-sm text-muted-foreground">Soft message bell</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => playTone('gentle-bell')}
+                            disabled={playingSound === 'gentle-bell'}
+                          >
+                            {playingSound === 'gentle-bell' ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                          </Button>
+                          <input
+                            type="radio"
+                            name="message-tone"
+                            value="gentle-bell"
+                            checked={soundSettings.messageTone === "gentle-bell"}
+                            onChange={(e) => handleToneChange("message", e.target.value)}
+                            className="w-4 h-4 text-primary"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <Volume2 className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="text-foreground font-medium">Nature Chime</p>
+                            <p className="text-sm text-muted-foreground">Peaceful message sound</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => playTone('nature-chime')}
+                            disabled={playingSound === 'nature-chime'}
+                          >
+                            {playingSound === 'nature-chime' ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                          </Button>
+                          <input
+                            type="radio"
+                            name="message-tone"
+                            value="nature-chime"
+                            checked={soundSettings.messageTone === "nature-chime"}
+                            onChange={(e) => handleToneChange("message", e.target.value)}
+                            className="w-4 h-4 text-primary"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Upload Custom Ringtone */}
+                  <div className="border-t border-border pt-6">
+                    <h4 className="font-semibold text-foreground mb-4">Upload Custom Ringtone</h4>
+                    <div className="space-y-4">
+                      <div>
+                        <input
+                          type="file"
+                          accept="audio/*"
+                          onChange={handleCustomRingtoneUpload}
+                          className="hidden"
+                          id="ringtone-upload"
+                          disabled={uploadingRingtone}
+                        />
+                        <Button
+                          variant="outline"
+                          className="w-full"
+                          disabled={uploadingRingtone}
+                          onClick={() => document.getElementById('ringtone-upload')?.click()}
+                        >
+                          {uploadingRingtone ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
+                              Uploading...
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="h-4 w-4 mr-2" />
+                              Upload Custom Ringtone
+                            </>
+                          )}
+                        </Button>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Supported formats: MP3, WAV, OGG. Max size: 5MB
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Button
+                    variant="primary"
+                    onClick={handleSaveSoundSettings}
+                    className="w-full text-sm sm:text-base"
+                  >
+                    <Save className="h-4 w-4 mr-1.5 sm:mr-2 flex-shrink-0" />
+                    <span>Save Sound Settings</span>
+                  </Button>
                 </div>
               </Card>
             </TabsContent>
