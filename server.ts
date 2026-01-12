@@ -8,6 +8,7 @@ const dev = process.env.NODE_ENV !== "production";
 const port = parseInt(process.env.PORT || "3000", 10);
 
 console.log("🚀 Starting server...");
+console.log(`🧠 Node Version: ${process.version}`);
 console.log(`📦 Environment: ${process.env.NODE_ENV || "development"}`);
 console.log(`🔌 Port: ${port}`);
 console.log(`🚂 Railway Project ID: ${process.env.RAILWAY_PROJECT_ID ? "DETECTED" : "NOT DETECTED"}`);
@@ -58,9 +59,10 @@ app.prepare().then(() => {
 
   // Bind to 0.0.0.0 for Railway compatibility
   httpServer.listen(port, '0.0.0.0', () => {
-    console.log(`✅ Server ready on port ${port}`);
-    console.log(`✅ WebSocket initialized on default path: /socket.io`);
-    console.log(`🌐 Listening on: ${process.env.NODE_ENV === 'production' ? 'Production' : 'Development'} (host: 0.0.0.0)`);
+    console.log(`🚀 Listening on port ${port}`);
+    console.log(`🔌 Socket.IO initialized`);
+    console.log(`✅ Custom Node server running (NOT serverless)`);
+    console.log(`🌐 Railway deployment active - full WebSocket support`);
     console.log(`🚀 Startup complete at ${new Date().toISOString()}`);
   });
 });
