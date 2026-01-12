@@ -93,9 +93,6 @@ export const getSocket = (): CustomSocket | null => {
     socket.on("connect_error", (error) => {
       console.error("❌ [Client] WebSocket CONNECTION ERROR:", {
         message: error.message,
-        type: error.type,
-        description: error.description,
-        context: error.context,
         timestamp: new Date().toISOString()
       });
     });

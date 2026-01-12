@@ -34,10 +34,15 @@ app.prepare().then(() => {
     });
     const io = (0, index_1.initializeSocket)(httpServer);
     io.engine.on("connection_error", (err) => {
-        console.error("❌ Socket.io error:", err);
+        console.error("❌ Socket.io engine error:", err);
+    });
+    io.on("connection", (socket) => {
+        console.log(`🔗 [Main] Socket connected: ${socket.id}`);
     });
     httpServer.listen(port, () => {
         console.log(`✅ Server ready on port ${port}`);
-        console.log(`✅ WebSocket initialized`);
+        console.log(`✅ WebSocket initialized on path: /socket.io-custom`);
+        console.log(`🌐 Listening on: ${process.env.NODE_ENV === 'production' ? 'Production' : 'Development'}`);
+        console.log(`🚀 Startup complete at ${new Date().toISOString()}`);
     });
 });
