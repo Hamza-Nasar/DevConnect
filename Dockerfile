@@ -10,8 +10,8 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production=false --silent
+# Install ALL dependencies (including devDependencies for build)
+RUN npm ci --silent
 
 # Copy source code
 COPY . .
@@ -32,11 +32,8 @@ WORKDIR /app
 RUN addgroup -g 1001 -S nodejs
 RUN adduser -S nextjs -u 1001
 
-# Copy package files
-COPY package*.json ./
-
-# Install only production dependencies
-RUN npm ci --only=production --silent && npm cache clean --force
+# Copy node_modules from build stage (includes all dependencies)
+COPY --from=base --chown=nextjs:nodejs /app/node_modules ./node_modules
 
 # Copy built application from build stage
 COPY --from=base --chown=nextjs:nodejs /app/.next ./.next
