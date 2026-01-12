@@ -68,7 +68,7 @@ export default function MessageItem({
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9 }}
-            className={`group flex ${isOwn ? "justify-end" : "justify-start"} mb-2 px-2 sm:px-4 relative`}
+            className={`group flex w-full ${isOwn ? "justify-end" : "justify-start"} mb-2 px-2 sm:px-4 relative`}
         >
             <div
                 className={`flex items-end gap-2 max-w-[90%] sm:max-w-[85%] lg:max-w-[75%] ${isOwn ? "flex-row-reverse" : "flex-row"}`}
@@ -154,9 +154,9 @@ export default function MessageItem({
 
                     {/* Message Bubble */}
                     <div
-                        className={`relative rounded-2xl px-4 py-2.5 transition-all ${isOwn
-                            ? "bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-br-none shadow-blue-900/10"
-                            : "bg-gray-800 text-gray-100 rounded-bl-none border border-gray-700"
+                        className={`relative rounded-2xl px-4 py-2.5 transition-all max-w-xs sm:max-w-sm lg:max-w-md ${isOwn
+                            ? "bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-br-md rounded-bl-2xl rounded-tr-2xl rounded-tl-md shadow-lg"
+                            : "bg-gray-800 text-gray-100 rounded-bl-md rounded-br-2xl rounded-tr-2xl rounded-tl-md border border-gray-700/50 shadow-md"
                             } ${isLongPressed ? "ring-2 ring-purple-500 scale-[0.98]" : ""}`}
                     >
                         {message.type === "text" && (
