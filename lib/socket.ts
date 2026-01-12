@@ -48,17 +48,15 @@ export const getSocket = (): CustomSocket | null => {
 
     socket = io(socketUrl, {
       path: "/socket.io-custom",
-      transports: ["polling", "websocket"], // Try polling first for Railway compatibility
+      transports: ["websocket"], // Force WebSocket only - no polling
       reconnection: true,
-      reconnectionAttempts: 10, // Limit reconnection attempts
-      reconnectionDelay: 2000,
-      reconnectionDelayMax: 10000,
-      timeout: 15000, // Reduced timeout to match server
-      withCredentials: false, // Disable credentials for Railway
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 10000,
+      withCredentials: true, // Enable credentials for production
       autoConnect: true,
       forceNew: true,
-      upgrade: false, // Disable upgrade for Railway stability
-      rememberUpgrade: false,
     }) as CustomSocket;
 
   // Diagnostics for debugging
@@ -93,7 +91,13 @@ export const getSocket = (): CustomSocket | null => {
     });
 
     socket.on("connect_error", (error) => {
-      console.error("❌ [Client] CONNECTION ERROR:", error.message);
+      console.error("❌ [Client] WebSocket CONNECTION ERROR:", {
+        message: error.message,
+        type: error.type,
+        description: error.description,
+        context: error.context,
+        timestamp: new Date().toISOString()
+      });
     });
 
     socket.on("disconnect", (reason) => {

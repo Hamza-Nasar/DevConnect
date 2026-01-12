@@ -38,17 +38,17 @@ export function initializeSocket(server: HTTPServer) {
       origin: getAllowedOrigins(),
       methods: ["GET", "POST"],
       credentials: true,
-      allowedHeaders: ["Content-Type", "Authorization"],
+      allowedHeaders: ["Content-Type", "Authorization", "Cookie"],
     },
     path: "/socket.io-custom",
-    addTrailingSlash: true,
-    transports: ["polling", "websocket"], // Try polling first for Railway compatibility
-    allowEIO3: true,
-    pingTimeout: 30000, // Reduced timeout for better Railway compatibility
-    pingInterval: 15000, // More frequent pings
-    connectTimeout: 20000, // Connection timeout
-    maxHttpBufferSize: 1e8, // 100MB for large data
-    cookie: false, // Disable cookies for Railway
+    addTrailingSlash: false,
+    transports: ["websocket"], // Force WebSocket only
+    allowEIO3: false,
+    pingTimeout: 20000,
+    pingInterval: 10000,
+    connectTimeout: 15000,
+    maxHttpBufferSize: 1e6, // 1MB
+    cookie: false,
   });
 
   // Make socket instance globally accessible
@@ -136,10 +136,11 @@ export function initializeSocket(server: HTTPServer) {
   console.log("🚀 Socket.IO Server Initialized");
   console.log("📊 Socket.IO Configuration:", {
     path: "/socket.io-custom",
-    transports: ["polling", "websocket"],
-    pingTimeout: 30000,
-    pingInterval: 15000,
-    cors: getAllowedOrigins() === true ? "all origins" : getAllowedOrigins()
+    transports: ["websocket"],
+    pingTimeout: 20000,
+    pingInterval: 10000,
+    cors: getAllowedOrigins() === true ? "all origins" : getAllowedOrigins(),
+    timestamp: new Date().toISOString()
   });
 
   // Add health check for WebSocket connections
@@ -155,10 +156,18 @@ export function initializeSocket(server: HTTPServer) {
   });
 
   io.on("connection", (socket: CustomSocket) => {
-    console.log(`🔌 [Server] New connection: ${socket.id}`);
+    console.log(`🔌 [Server] New WebSocket connection: ${socket.id} from ${socket.handshake.address}`);
 
     socket.on("ping_heartbeat", () => {
       socket.emit("pong_heartbeat");
+    });
+
+    socket.on("connect_error", (error) => {
+      console.error(`❌ [Server] Socket ${socket.id} connection error:`, error.message);
+    });
+
+    socket.on("error", (error) => {
+      console.error(`❌ [Server] Socket ${socket.id} error:`, error);
     });
 
     socket.on("join", async (userId: string) => {

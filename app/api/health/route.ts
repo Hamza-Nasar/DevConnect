@@ -29,6 +29,7 @@ export async function GET() {
 
     // Check WebSocket health
     const socketHealth = getSocketHealth();
+    console.log(`🏥 [Health] WebSocket status:`, socketHealth);
 
     const response = {
       status: (dbStatus === "connected" && socketHealth.status === "connected") ? "healthy" : "degraded",
