@@ -40,9 +40,10 @@ export function initializeSocket(server: HTTPServer) {
       credentials: true,
       allowedHeaders: ["Content-Type", "Authorization", "Cookie"],
     },
-    path: "/socket.io-custom",
+    // Use default Socket.IO path for Railway compatibility
+    path: "/socket.io",
     addTrailingSlash: false,
-    transports: ["websocket"], // Force WebSocket only
+    transports: ["websocket", "polling"], // Allow both WebSocket and polling
     allowEIO3: false,
     pingTimeout: 20000,
     pingInterval: 10000,
@@ -135,8 +136,8 @@ export function initializeSocket(server: HTTPServer) {
 
   console.log("🚀 Socket.IO Server Initialized");
   console.log("📊 Socket.IO Configuration:", {
-    path: "/socket.io-custom",
-    transports: ["websocket"],
+    path: "/socket.io",
+    transports: ["websocket", "polling"],
     pingTimeout: 20000,
     pingInterval: 10000,
     cors: getAllowedOrigins() === true ? "all origins" : getAllowedOrigins(),

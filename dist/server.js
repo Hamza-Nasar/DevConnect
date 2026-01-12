@@ -17,12 +17,8 @@ const app = (0, next_1.default)({ dev });
 const handle = app.getRequestHandler();
 app.prepare().then(() => {
     const httpServer = (0, http_1.createServer)(async (req, res) => {
-        var _a, _b;
         try {
-            if (((_a = req.url) === null || _a === void 0 ? void 0 : _a.startsWith("/socket.io")) ||
-                ((_b = req.url) === null || _b === void 0 ? void 0 : _b.startsWith("/socket.io-custom"))) {
-                return;
-            }
+            // Let Socket.IO handle its own routes - no need to exclude them
             const parsedUrl = (0, url_1.parse)(req.url, true);
             await handle(req, res, parsedUrl);
         }
@@ -39,10 +35,11 @@ app.prepare().then(() => {
     io.on("connection", (socket) => {
         console.log(`🔗 [Main] Socket connected: ${socket.id}`);
     });
-    httpServer.listen(port, () => {
+    // Bind to 0.0.0.0 for Railway compatibility
+    httpServer.listen(port, '0.0.0.0', () => {
         console.log(`✅ Server ready on port ${port}`);
-        console.log(`✅ WebSocket initialized on path: /socket.io-custom`);
-        console.log(`🌐 Listening on: ${process.env.NODE_ENV === 'production' ? 'Production' : 'Development'}`);
+        console.log(`✅ WebSocket initialized on default path: /socket.io`);
+        console.log(`🌐 Listening on: ${process.env.NODE_ENV === 'production' ? 'Production' : 'Development'} (host: 0.0.0.0)`);
         console.log(`🚀 Startup complete at ${new Date().toISOString()}`);
     });
 });

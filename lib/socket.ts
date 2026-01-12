@@ -39,7 +39,7 @@ export const getSocket = (): CustomSocket | null => {
 
     console.log("🔌 [Client] Initializing Socket...", {
       url: socketUrl,
-      path: "/socket.io-custom",
+      path: "/socket.io",
       isProduction,
       isVercel,
       isRailway,
@@ -47,7 +47,7 @@ export const getSocket = (): CustomSocket | null => {
     });
 
     socket = io(socketUrl, {
-      path: "/socket.io-custom",
+      path: "/socket.io",
       transports: ["websocket"], // Force WebSocket only - no polling
       reconnection: true,
       reconnectionAttempts: 5,
@@ -63,7 +63,7 @@ export const getSocket = (): CustomSocket | null => {
   if (typeof window !== "undefined") {
     (window as any).SOCKET_DEBUG = {
       socket,
-      config: { socketUrl, path: "/socket.io-custom" },
+      config: { socketUrl, path: "/socket.io" },
       getStatus: () => ({
         connected: socket?.connected,
         id: socket?.id,
