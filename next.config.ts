@@ -2,6 +2,13 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // Force serverful deployment on Railway (not serverless)
+  ...(process.env.RAILWAY_PROJECT_ID && {
+    output: undefined, // Don't set output to 'standalone' or 'export'
+    experimental: {
+      serverComponentsExternalPackages: [],
+    },
+  }),
   images: {
     remotePatterns: [
       {
@@ -22,6 +29,13 @@ const nextConfig: NextConfig = {
     GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID,
     GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET,
     NEXT_PUBLIC_SOCKET_URL: process.env.NEXT_PUBLIC_SOCKET_URL,
+    // Railway detection environment variables
+    RAILWAY_PROJECT_ID: process.env.RAILWAY_PROJECT_ID,
+    RAILWAY_ENVIRONMENT_ID: process.env.RAILWAY_ENVIRONMENT_ID,
+    RAILWAY_SERVICE_ID: process.env.RAILWAY_SERVICE_ID,
+    RAILWAY_STATIC_URL: process.env.RAILWAY_STATIC_URL,
+    // Deployment environment detection
+    DEPLOYMENT_PLATFORM: process.env.RAILWAY_PROJECT_ID ? 'railway' : process.env.VERCEL ? 'vercel' : 'unknown',
   },
 };
 

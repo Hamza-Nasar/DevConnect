@@ -14,12 +14,33 @@ export const getSocket = (): CustomSocket | null => {
     const origin = window.location.origin.replace(/\/$/, "");
     let socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || origin;
 
-    // In production, if NEXT_PUBLIC_SOCKET_URL is not set and we're on Vercel, this is a critical error
-    const isVercel = window.location?.hostname?.includes("vercel.app");
-    const isRailway = window.location?.hostname?.includes("railway.app");
+    // Environment detection using server-side variables (more reliable than hostname)
+    const deploymentPlatform = process.env.DEPLOYMENT_PLATFORM || 'unknown';
+    const isRailway = deploymentPlatform === 'railway' || !!process.env.RAILWAY_PROJECT_ID;
+    const isVercel = deploymentPlatform === 'vercel' || !!process.env.VERCEL;
     const isProduction = process.env.NODE_ENV === "production";
 
-    if (isProduction && isVercel && !process.env.NEXT_PUBLIC_SOCKET_URL) {
+    // Fallback hostname detection for edge cases
+    const hostnameVercel = window.location?.hostname?.includes("vercel.app");
+    const hostnameRailway = window.location?.hostname?.includes("railway.app") ||
+                           window.location?.hostname?.includes("up.railway.app");
+
+    // Use server-side detection as primary, hostname as fallback
+    const finalIsRailway = isRailway || (!isVercel && hostnameRailway);
+    const finalIsVercel = isVercel || hostnameVercel;
+
+    console.log("🔍 [Client] Environment Detection:", {
+      deploymentPlatform,
+      serverRailway: isRailway,
+      serverVercel: isVercel,
+      hostnameRailway,
+      hostnameVercel,
+      finalRailway: finalIsRailway,
+      finalVercel: finalIsVercel,
+      isProduction
+    });
+
+    if (isProduction && finalIsVercel && !process.env.NEXT_PUBLIC_SOCKET_URL) {
       console.error("❌ [Client] CRITICAL: Vercel deployment detected but NEXT_PUBLIC_SOCKET_URL is not set! Socket.io server cannot run on Vercel. Please set NEXT_PUBLIC_SOCKET_URL to your Railway backend URL in Vercel environment variables.");
       // Don't initialize socket if we can't connect to the right server
       return null;
@@ -33,16 +54,17 @@ export const getSocket = (): CustomSocket | null => {
     // Remove trailing slash
     socketUrl = socketUrl.replace(/\/$/, "");
 
-    if (isRailway) {
+    if (finalIsRailway) {
       console.log("🚂 [Client] Detected Railway deployment. WebSockets should be fully supported.");
     }
 
     console.log("🔌 [Client] Initializing Socket...", {
       url: socketUrl,
       path: "/socket.io",
+      deploymentPlatform,
       isProduction,
-      isVercel,
-      isRailway,
+      isRailway: finalIsRailway,
+      isVercel: finalIsVercel,
       timestamp: new Date().toISOString()
     });
 

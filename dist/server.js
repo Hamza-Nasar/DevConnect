@@ -13,6 +13,23 @@ const port = parseInt(process.env.PORT || "3000", 10);
 console.log("🚀 Starting server...");
 console.log(`📦 Environment: ${process.env.NODE_ENV || "development"}`);
 console.log(`🔌 Port: ${port}`);
+console.log(`🚂 Railway Project ID: ${process.env.RAILWAY_PROJECT_ID ? "DETECTED" : "NOT DETECTED"}`);
+console.log(`☁️ Vercel Environment: ${process.env.VERCEL ? "DETECTED" : "NOT DETECTED"}`);
+console.log(`🌐 Hostname will be: 0.0.0.0 (Railway requirement)`);
+console.log(`🔧 Server Mode: Custom Node.js server (NOT serverless)`);
+// Force custom server mode detection
+const isRailway = !!process.env.RAILWAY_PROJECT_ID;
+const isVercel = !!process.env.VERCEL;
+console.log(`🎯 Deployment Detection: Railway=${isRailway}, Vercel=${isVercel}`);
+if (isRailway) {
+    console.log("✅ Railway deployment confirmed - Socket.IO server will be initialized");
+}
+else if (isVercel) {
+    console.log("⚠️ Vercel deployment detected - Socket.IO may not work in serverless mode");
+}
+else {
+    console.log("🤔 Unknown deployment platform - assuming custom server setup");
+}
 const app = (0, next_1.default)({ dev });
 const handle = app.getRequestHandler();
 app.prepare().then(() => {
@@ -28,7 +45,9 @@ app.prepare().then(() => {
             res.end("Internal Server Error");
         }
     });
+    console.log("🔌 Initializing Socket.IO server...");
     const io = (0, index_1.initializeSocket)(httpServer);
+    console.log("✅ Socket.IO server initialized successfully");
     io.engine.on("connection_error", (err) => {
         console.error("❌ Socket.io engine error:", err);
     });
