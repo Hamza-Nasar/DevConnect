@@ -84,6 +84,11 @@ export default function SettingsPage() {
     messages: true,
   });
 
+  const [messageSettings, setMessageSettings] = useState({
+    popupEnabled: true,
+    soundEnabled: true,
+  });
+
   // Security Settings
   const [security, setSecurity] = useState({
     twoFactor: false,
@@ -128,11 +133,20 @@ export default function SettingsPage() {
     const savedMessageTone = localStorage.getItem("message_tone") || "quick-beep";
     const savedCustomRingtones = JSON.parse(localStorage.getItem("custom_ringtones") || "[]");
 
+    // Message popup and sound settings
+    const savedPopupEnabled = localStorage.getItem("message_popup_enabled");
+    const savedSoundEnabled = localStorage.getItem("message_sound_enabled");
+
     setSoundSettings({
       incomingRingtone: savedIncomingRingtone,
       notificationTone: savedNotificationTone,
       messageTone: savedMessageTone,
       customRingtones: savedCustomRingtones,
+    });
+
+    setMessageSettings({
+      popupEnabled: savedPopupEnabled !== null ? savedPopupEnabled === "true" : true,
+      soundEnabled: savedSoundEnabled !== null ? savedSoundEnabled === "true" : true,
     });
   }, [session]);
 
@@ -339,6 +353,17 @@ export default function SettingsPage() {
       toast.error("Failed to update privacy settings");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSaveMessageSettings = async () => {
+    try {
+      localStorage.setItem("message_popup_enabled", messageSettings.popupEnabled.toString());
+      localStorage.setItem("message_sound_enabled", messageSettings.soundEnabled.toString());
+      toast.success("Message notification settings saved!");
+    } catch (error) {
+      console.error("Error saving message settings:", error);
+      toast.error("Failed to save message settings");
     }
   };
 
@@ -963,15 +988,56 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  <Button
-                    variant="primary"
-                    onClick={handleSaveNotifications}
-                    disabled={loading}
-                    className="w-full text-sm sm:text-base"
-                  >
-                    <Save className="h-4 w-4 mr-1.5 sm:mr-2 flex-shrink-0" />
-                    <span className="truncate">Save Notification Settings</span>
-                  </Button>
+                  <div className="border-t border-border pt-4">
+                    <h4 className="font-semibold text-foreground mb-4">Message Notifications</h4>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-muted-foreground">Show Message Popups</span>
+                          <p className="text-xs text-muted-foreground">Display popup notifications for new messages</p>
+                        </div>
+                        <Switch
+                          checked={messageSettings.popupEnabled}
+                          onCheckedChange={(checked) =>
+                            setMessageSettings({ ...messageSettings, popupEnabled: checked })
+                          }
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-muted-foreground">Message Sound</span>
+                          <p className="text-xs text-muted-foreground">Play sound for incoming messages</p>
+                        </div>
+                        <Switch
+                          checked={messageSettings.soundEnabled}
+                          onCheckedChange={(checked) =>
+                            setMessageSettings({ ...messageSettings, soundEnabled: checked })
+                          }
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <Button
+                      variant="outline"
+                      onClick={handleSaveMessageSettings}
+                      className="flex-1 text-sm sm:text-base"
+                    >
+                      <Volume2 className="h-4 w-4 mr-1.5 sm:mr-2 flex-shrink-0" />
+                      <span className="truncate">Save Message Settings</span>
+                    </Button>
+
+                    <Button
+                      variant="primary"
+                      onClick={handleSaveNotifications}
+                      disabled={loading}
+                      className="flex-1 text-sm sm:text-base"
+                    >
+                      <Save className="h-4 w-4 mr-1.5 sm:mr-2 flex-shrink-0" />
+                      <span className="truncate">Save Notification Settings</span>
+                    </Button>
+                  </div>
                 </div>
               </Card>
             </TabsContent>

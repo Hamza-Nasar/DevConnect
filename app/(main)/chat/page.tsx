@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
@@ -128,7 +128,7 @@ export default function ChatPage() {
     }
   }, [session?.user?.id]);
 
-  // Handle mobile keyboard layout stability - Simplified WhatsApp style approach
+  // Premium Mobile Keyboard Handling - Modern WhatsApp-style implementation
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -143,140 +143,227 @@ export default function ChatPage() {
 
     let keyboardVisible = false;
     let lastScrollPosition = 0;
+    let keyboardHeight = 0;
+    let originalBodyOverflow = '';
+    let originalBodyPosition = '';
+    let originalBodyWidth = '';
 
-    // Simple and effective keyboard handling
-    const handleKeyboardVisibility = () => {
+    // Premium keyboard detection with better accuracy
+    const detectKeyboard = () => {
       const visualViewport = window.visualViewport;
-      if (!visualViewport) return;
+      if (!visualViewport) {
+        // Fallback for older browsers
+        const heightDiff = window.innerHeight - window.innerHeight;
+        return heightDiff > 150;
+      }
 
       const viewportHeight = visualViewport.height;
       const windowHeight = window.innerHeight;
       const heightDiff = windowHeight - viewportHeight;
 
-      // Detect keyboard (significant height difference)
-      const isKeyboardVisible = heightDiff > 150;
+      // More accurate keyboard detection
+      keyboardHeight = Math.max(0, heightDiff);
+      return heightDiff > 120; // Slightly lower threshold for better detection
+    };
 
-      if (isKeyboardVisible !== keyboardVisible) {
-        keyboardVisible = isKeyboardVisible;
+    // Smooth height transition function
+    const updateLayout = (isKeyboardVisible: boolean, smooth = true) => {
+      if (keyboardVisible === isKeyboardVisible) return;
 
-        if (keyboardVisible) {
-          // Store current scroll position
-          lastScrollPosition = messagesContainer.scrollTop;
+      keyboardVisible = isKeyboardVisible;
 
-          // Apply fixed positioning to prevent layout shifts
-          chatContainer.style.position = 'fixed';
-          chatContainer.style.top = '0';
-          chatContainer.style.left = '0';
-          chatContainer.style.right = '0';
-          chatContainer.style.bottom = '0';
-          chatContainer.style.height = '100dvh'; // Use dynamic viewport height
-          chatContainer.style.overflow = 'hidden';
+      if (isKeyboardVisible) {
+        // Store current scroll position
+        lastScrollPosition = messagesContainer.scrollTop;
 
-          // Adjust messages container height to account for input
-          const inputHeight = chatInput.offsetHeight || 80;
-          const availableHeight = viewportHeight - inputHeight - 20; // 20px padding
-          messagesContainer.style.height = `${availableHeight}px`;
-          messagesContainer.style.maxHeight = `${availableHeight}px`;
-          messagesContainer.style.overflowY = 'auto';
+        // Prevent body scroll and fix position
+        originalBodyOverflow = document.body.style.overflow || '';
+        originalBodyPosition = document.body.style.position || '';
+        originalBodyWidth = document.body.style.width || '';
 
-          // Ensure input stays at bottom
-          chatInput.style.position = 'absolute';
-          chatInput.style.bottom = '0';
-          chatInput.style.left = '0';
-          chatInput.style.right = '0';
-          chatInput.style.zIndex = '10';
+        document.body.style.overflow = 'hidden';
+        document.body.style.position = 'fixed';
+        document.body.style.width = '100%';
 
-          // Prevent body scroll
-          document.body.style.overflow = 'hidden';
-          document.body.style.position = 'fixed';
-          document.body.style.width = '100%';
+        // Apply fixed positioning to chat container with modern viewport units
+        Object.assign(chatContainer.style, {
+          position: 'fixed',
+          top: '0',
+          left: '0',
+          right: '0',
+          bottom: '0',
+          height: '100dvh', // Dynamic viewport height
+          overflow: 'hidden',
+          transition: smooth ? 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
+          WebkitTransform: 'translateZ(0)', // Force hardware acceleration
+          transform: 'translateZ(0)',
+          WebkitBackfaceVisibility: 'hidden',
+          backfaceVisibility: 'hidden',
+        });
 
-          // Maintain scroll position after keyboard animation
+        // Calculate available height for messages (accounting for input and safe areas)
+        const visualViewport = window.visualViewport;
+        const viewportHeight = visualViewport ? visualViewport.height : window.innerHeight;
+        const inputHeight = chatInput.offsetHeight || 80;
+
+        // Account for safe areas (notches, home indicators)
+        const safeAreaBottom = 0; // Will be handled by CSS env() values
+        const safeAreaTop = 0;
+
+        const availableHeight = viewportHeight - inputHeight - safeAreaBottom - 16; // 16px margin
+
+        Object.assign(messagesContainer.style, {
+          height: `${availableHeight}px`,
+          maxHeight: `${availableHeight}px`,
+          overflowY: 'auto',
+          transition: smooth ? 'height 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
+          WebkitOverflowScrolling: 'touch', // Smooth scrolling on iOS
+        });
+
+        // Position input at bottom with safe area support
+        Object.assign(chatInput.style, {
+          position: 'absolute',
+          bottom: `${safeAreaBottom}px`,
+          left: '0',
+          right: '0',
+          zIndex: '10',
+          transition: smooth ? 'bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
+          paddingBottom: 'env(safe-area-inset-bottom)',
+        });
+
+        // Scroll to maintain position after keyboard animation
+        if (smooth) {
           setTimeout(() => {
             messagesContainer.scrollTop = lastScrollPosition;
-            scrollToBottom(true); // Instant scroll to maintain position
-          }, 300);
-        } else {
-          // Reset to normal layout
-          chatContainer.style.position = '';
-          chatContainer.style.top = '';
-          chatContainer.style.left = '';
-          chatContainer.style.right = '';
-          chatContainer.style.bottom = '';
-          chatContainer.style.height = '';
-          chatContainer.style.overflow = '';
+            scrollToBottom(true);
+          }, 350);
+        }
+      } else {
+        // Smoothly reset to normal layout
+        const resetStyles = (element: HTMLElement, styles: Record<string, string>) => {
+          Object.keys(styles).forEach(key => {
+            element.style.setProperty(key, styles[key]);
+          });
+        };
 
-          messagesContainer.style.height = '';
-          messagesContainer.style.maxHeight = '';
-          messagesContainer.style.overflowY = '';
+        resetStyles(chatContainer, {
+          position: '',
+          top: '',
+          left: '',
+          right: '',
+          bottom: '',
+          height: '',
+          overflow: '',
+          transition: smooth ? 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
+        });
 
-          chatInput.style.position = '';
-          chatInput.style.bottom = '';
-          chatInput.style.left = '';
-          chatInput.style.right = '';
-          chatInput.style.zIndex = '';
+        resetStyles(messagesContainer, {
+          height: '',
+          maxHeight: '',
+          overflowY: '',
+          transition: smooth ? 'height 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
+        });
 
-          // Restore body scroll
-          document.body.style.overflow = '';
-          document.body.style.position = '';
-          document.body.style.width = '';
+        resetStyles(chatInput, {
+          position: '',
+          bottom: '',
+          left: '',
+          right: '',
+          zIndex: '',
+          transition: smooth ? 'bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
+          paddingBottom: '',
+        });
 
-          // Restore scroll position
+        // Restore body styles
+        document.body.style.overflow = originalBodyOverflow;
+        document.body.style.position = originalBodyPosition;
+        document.body.style.width = originalBodyWidth;
+
+        // Restore scroll position
+        if (smooth) {
           setTimeout(() => {
             messagesContainer.scrollTop = lastScrollPosition;
-          }, 100);
+          }, 150);
         }
       }
     };
 
-    const handleOrientationChange = () => {
-      // Reset after orientation change
-      setTimeout(handleKeyboardVisibility, 300);
+    // Enhanced keyboard visibility handler
+    const handleKeyboardVisibility = () => {
+      const isKeyboardVisible = detectKeyboard();
+      updateLayout(isKeyboardVisible, true);
     };
 
-    // Use Visual Viewport API for better mobile support
+    const handleOrientationChange = () => {
+      // Reset after orientation change with delay for viewport stabilization
+      setTimeout(() => {
+        updateLayout(false, false); // Reset first
+        setTimeout(handleKeyboardVisibility, 100);
+      }, 300);
+    };
+
+    // Visual Viewport API with better event handling
     if (window.visualViewport) {
       window.visualViewport.addEventListener('resize', handleKeyboardVisibility);
       window.visualViewport.addEventListener('scroll', handleKeyboardVisibility);
     }
 
-    // Fallback for older browsers
+    // Fallback for older browsers and additional events
     window.addEventListener('resize', handleKeyboardVisibility);
     window.addEventListener('orientationchange', handleOrientationChange);
 
-    // Handle input focus/blur
+    // Enhanced input focus handling
     const handleFocusIn = (e: FocusEvent) => {
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
-        // Store scroll position before keyboard opens
         lastScrollPosition = messagesContainer.scrollTop;
-        setTimeout(handleKeyboardVisibility, 100);
+        // Delay to allow keyboard to start appearing
+        setTimeout(handleKeyboardVisibility, 150);
       }
     };
 
     const handleFocusOut = (e: FocusEvent) => {
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
-        setTimeout(handleKeyboardVisibility, 300); // Allow keyboard to hide
+        // Longer delay to allow keyboard to fully hide
+        setTimeout(() => {
+          const isStillKeyboardVisible = detectKeyboard();
+          if (!isStillKeyboardVisible) {
+            updateLayout(false, true);
+          }
+        }, 400);
       }
     };
 
-    document.addEventListener('focusin', handleFocusIn);
-    document.addEventListener('focusout', handleFocusOut);
-
-    // Handle page visibility
+    // Handle page visibility changes
     const handleVisibilityChange = () => {
       if (!document.hidden) {
         setTimeout(handleKeyboardVisibility, 100);
       }
     };
+
+    document.addEventListener('focusin', handleFocusIn);
+    document.addEventListener('focusout', handleFocusOut);
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
+    // Handle touch events for better mobile experience
+    const handleTouchStart = () => {
+      // Prevent zoom on double tap
+      let lastTouchEnd = 0;
+      const now = Date.now();
+      if (now - lastTouchEnd <= 300) {
+        event?.preventDefault();
+      }
+      lastTouchEnd = now;
+    };
+
+    document.addEventListener('touchend', handleTouchStart, false);
+
     // Initial setup
-    handleKeyboardVisibility();
+    setTimeout(handleKeyboardVisibility, 100);
 
     return () => {
-      // Cleanup
+      // Comprehensive cleanup
       if (window.visualViewport) {
         window.visualViewport.removeEventListener('resize', handleKeyboardVisibility);
         window.visualViewport.removeEventListener('scroll', handleKeyboardVisibility);
@@ -287,29 +374,20 @@ export default function ChatPage() {
       document.removeEventListener('focusin', handleFocusIn);
       document.removeEventListener('focusout', handleFocusOut);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener('touchend', handleTouchStart);
 
-      // Reset styles
-      if (chatContainer) {
-        chatContainer.style.position = '';
-        chatContainer.style.height = '';
-        chatContainer.style.overflow = '';
-      }
+      // Reset all styles
+      const elements = [chatContainer, messagesContainer, chatInput];
+      elements.forEach(element => {
+        if (element) {
+          element.style.cssText = '';
+        }
+      });
 
-      if (messagesContainer) {
-        messagesContainer.style.height = '';
-        messagesContainer.style.maxHeight = '';
-        messagesContainer.style.overflowY = '';
-      }
-
-      if (chatInput) {
-        chatInput.style.position = '';
-        chatInput.style.bottom = '';
-        chatInput.style.zIndex = '';
-      }
-
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.width = '';
+      // Restore body styles
+      document.body.style.overflow = originalBodyOverflow;
+      document.body.style.position = originalBodyPosition;
+      document.body.style.width = originalBodyWidth;
     };
   }, [selectedChat]);
 
@@ -390,6 +468,47 @@ export default function ChatPage() {
 
           if (message.receiverId === currentUserId) {
             markAsRead(currentSelected.userId);
+          }
+        } else {
+          // Emit enhanced message for global popup (only if not in current chat)
+          if (message.receiverId === currentUserId && message.senderId !== currentUserId) {
+            // Find the chat user from our chats list, or create from message sender
+            let chatUser = chats.find(chat =>
+              chat.userId === message.senderId ||
+              (chat.user?.alternativeIds || []).includes(message.senderId)
+            );
+
+            // If not found in chats, create from message sender info
+            if (!chatUser && message.sender) {
+              chatUser = {
+                id: `temp-chat-${message.senderId}-${Date.now()}`,
+                user: message.sender,
+                userId: message.senderId,
+                unreadCount: 1,
+                lastMessage: {
+                  content: message.content,
+                  createdAt: message.createdAt,
+                  read: message.read
+                }
+              };
+            }
+
+            if (chatUser) {
+              const enhancedMessage = {
+                ...message,
+                chatUser: chatUser.user,
+              };
+
+              // Emit to all connected sockets for popup notifications
+              const globalSocket = getSocket();
+              if (globalSocket) {
+                // Use a different event name to avoid recursion
+                console.log("📤 Emitting global message notification:", enhancedMessage);
+                globalSocket.emit("global_message_notification", enhancedMessage);
+              } else {
+                console.log("❌ No socket available for global notification");
+              }
+            }
           }
         }
       }
@@ -1317,7 +1436,7 @@ export default function ChatPage() {
         </div>
       </div>
       <div className={`transition-all duration-300 ease-in-out ${selectedChat ? "pt-0 lg:pt-16" : "pt-16 lg:pl-72 xl:pl-80"}`}>
-        <div className={`px-4 sm:px-6 py-4 sm:py-6 lg:py-8 min-h-screen lg:min-h-[calc(100vh-4rem)] xl:min-h-[calc(100vh-4rem)] ${
+        <div className={`px-4 sm:px-6 py-4 sm:py-6 lg:py-8 min-h-[100dvh] lg:min-h-[calc(100dvh-4rem)] xl:min-h-[calc(100dvh-4rem)] supports-[height:100dvh]:min-h-dvh supports-[height:100dvh]:lg:min-h-[calc(100dvh-4rem)] supports-[height:100dvh]:xl:min-h-[calc(100dvh-4rem)] ${
           selectedChat ? "w-full lg:px-12" : "w-full max-w-4xl mx-auto lg:px-8 xl:px-12"
         }`}>
           <div
@@ -1485,7 +1604,7 @@ export default function ChatPage() {
               variant="elevated"
               className={`p-0 overflow-hidden flex flex-col bg-gray-900/60 backdrop-blur-xl border-gray-800 transition-all duration-300 ease-in-out transform-gpu chat-window-card ${
                 selectedChat
-                  ? "flex flex-1 min-w-0"
+                  ? "flex flex-1 min-w-0 lg:max-h-[calc(100vh-8rem)] xl:max-h-[calc(100vh-6rem)]"
                   : "hidden lg:flex"
               }`}
             >
@@ -1571,13 +1690,18 @@ export default function ChatPage() {
                     </div>
                   </div>
 
-                  {/* Messages - Enhanced */}
+                  {/* Messages - Premium Mobile Optimized */}
                   <div
-                    className="chat-messages-container flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 lg:p-6 space-y-3 sm:space-y-4 bg-background/50 custom-scrollbar chat-messages-pc"
+                    className="chat-messages-container flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 lg:p-6 space-y-3 sm:space-y-4 bg-background/50 custom-scrollbar chat-messages-pc will-change-scroll lg:flex-none lg:h-full lg:max-h-[calc(100%-120px)]"
                     style={{
                       overflowAnchor: 'auto',
-                      // Dynamic height will be set by JavaScript for mobile stability, natural height on PC
-                      minHeight: '200px'
+                      // Modern viewport units for better mobile support
+                      minHeight: 'calc(100dvh - 200px)', // Fallback minimum height
+                      WebkitOverflowScrolling: 'touch', // Smooth iOS scrolling
+                      scrollBehavior: 'smooth',
+                      // Hardware acceleration for smooth scrolling
+                      WebkitTransform: 'translateZ(0)',
+                      transform: 'translateZ(0)',
                     }}
                   >
                     <AnimatePresence>
@@ -1718,14 +1842,21 @@ export default function ChatPage() {
                     </motion.div>
                   )}
 
-                  {/* Message Input - Enhanced with Mobile Stability */}
+                  {/* Message Input - Premium Mobile Optimized */}
                   <div
-                    className="chat-input-stable p-2 sm:p-4 border-t border-gray-700/50 bg-gray-900/50"
+                    className="chat-input-stable p-2 sm:p-4 border-t border-gray-700/50 bg-gray-900/50 backdrop-blur-xl lg:flex-shrink-0 lg:relative lg:z-10"
                     style={{
                       position: 'relative',
                       zIndex: 10,
+                      // Hardware acceleration for smooth positioning
                       WebkitTransform: 'translateZ(0)',
                       transform: 'translateZ(0)',
+                      WebkitBackfaceVisibility: 'hidden',
+                      backfaceVisibility: 'hidden',
+                      // Safe area support
+                      paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))',
+                      paddingLeft: 'max(0.5rem, env(safe-area-inset-left))',
+                      paddingRight: 'max(0.5rem, env(safe-area-inset-right))',
                     }}
                   >
                     <div className="flex items-center gap-2">

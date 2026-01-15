@@ -1,10 +1,59 @@
 @import "tailwindcss";
 
-/* Enhanced Mobile Chat Stability - WhatsApp Style */
+/* Premium Mobile Keyboard Handling - Modern WhatsApp Style */
 @layer utilities {
+  /* Modern Viewport Units Support */
+  @supports (height: 100dvh) {
+    .min-h-screen {
+      min-height: 100dvh;
+    }
+
+    .h-screen {
+      height: 100dvh;
+    }
+
+    .max-h-screen {
+      max-height: 100dvh;
+    }
+  }
+
+  @supports (height: 100svh) {
+    .min-h-screen {
+      min-height: 100svh;
+    }
+
+    .h-screen {
+      height: 100svh;
+    }
+
+    .max-h-screen {
+      max-height: 100svh;
+    }
+  }
+
+  @supports (height: 100lvh) {
+    .min-h-screen {
+      min-height: 100lvh;
+    }
+
+    .h-screen {
+      height: 100lvh;
+    }
+
+    .max-h-screen {
+      max-height: 100lvh;
+    }
+  }
+
   .mobile-chat-stable {
-    /* Only apply mobile styles on mobile screens */
-    /* On PC screens, use normal positioning */
+    /* Premium mobile styles with modern viewport units */
+    /* Dynamic viewport height for keyboard handling */
+    height: 100dvh;
+    /* Fallbacks for older browsers */
+    height: 100svh;
+    height: 100lvh;
+    /* Legacy fallback */
+    height: calc(var(--vh, 1vh) * 100);
   }
 
   .chat-messages-container {
@@ -98,8 +147,10 @@
     }
 
     .chat-input-stable {
-      /* Mobile keyboard specific positioning */
-      padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+      /* Premium mobile keyboard positioning with safe areas */
+      padding-bottom: max(env(safe-area-inset-bottom), 0.5rem) !important;
+      padding-left: max(env(safe-area-inset-left), 0.5rem) !important;
+      padding-right: max(env(safe-area-inset-right), 0.5rem) !important;
       /* Ensure visibility when keyboard is present */
       position: fixed !important;
       /* Better input handling */
@@ -108,6 +159,19 @@
         font-size: 16px !important;
         /* Better touch targets */
         min-height: 44px !important;
+        /* Enhanced mobile experience */
+        -webkit-appearance: none;
+        border-radius: 0.5rem;
+        /* Better text selection */
+        -webkit-user-select: text;
+        user-select: text;
+      }
+
+      /* Premium input styling */
+      input:focus, textarea:focus {
+        /* Enhanced focus state */
+        box-shadow: 0 0 0 2px rgba(147, 51, 234, 0.3);
+        border-color: rgba(147, 51, 234, 0.5);
       }
     }
 
@@ -158,6 +222,43 @@
     /* Default PC styling - natural height */
     height: auto;
     max-height: none;
+  }
+
+  /* Large screen chat input always visible */
+  @media (min-width: 1024px) {
+    .chat-window-card {
+      /* Fixed height on large screens to keep input visible */
+      max-height: calc(100vh - 8rem);
+      height: calc(100vh - 8rem);
+      /* Ensure proper layout */
+      display: flex;
+      flex-direction: column;
+    }
+
+    .chat-messages-container {
+      /* Take available space but leave room for input */
+      flex: 1;
+      min-height: 0;
+      max-height: calc(100% - 120px);
+      /* Ensure scrolling works properly */
+      overflow-y: auto;
+    }
+
+    .chat-input-stable {
+      /* Always visible at bottom */
+      flex-shrink: 0;
+      position: relative;
+      bottom: 0;
+      z-index: 10;
+    }
+  }
+
+  @media (min-width: 1280px) {
+    .chat-window-card {
+      /* Extra large screens */
+      max-height: calc(100vh - 6rem);
+      height: calc(100vh - 6rem);
+    }
   }
 
   /* Large screen chat container optimizations - Premium Layout */
@@ -255,6 +356,14 @@
     .chat-messages-pc {
       /* Mobile specific styling - dynamic height set by JS */
       height: 100%;
+      /* Keep flex-1 behavior on mobile */
+      flex: 1;
+      max-height: none;
+    }
+
+    .chat-input-stable {
+      /* Mobile specific positioning */
+      position: relative;
     }
   }
 }
@@ -868,4 +977,50 @@
 
 .animate-gradient-border {
   animation: gradient-border 3s ease-in-out infinite;
+}
+
+/* Global Message Popup Animations */
+@keyframes message-popup-enter {
+  from {
+    opacity: 0;
+    transform: translateX(300px) scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes message-popup-exit {
+  from {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(300px) scale(0.8);
+  }
+}
+
+.message-popup-enter {
+  animation: message-popup-enter 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.message-popup-exit {
+  animation: message-popup-exit 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* Notification Progress Bar */
+@keyframes notification-progress {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+.notification-progress {
+  animation: notification-progress 5s linear forwards;
+  transform-origin: left;
 }
