@@ -50,10 +50,13 @@ import { useNavigationVisibility } from "@/lib/navigation-context";
 export default function ChatPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+
   const [chats, setChats] = useState<Chat[]>([]);
+  const [loadingChats, setLoadingChats] = useState(false);
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
   const selectedChatRef = useRef<Chat | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [loadingMessages, setLoadingMessages] = useState(false);
   const [messageInput, setMessageInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -260,7 +263,8 @@ export default function ChatPage() {
         resetStyles(messagesContainer, {
           height: '',
           maxHeight: '',
-          overflowY: '',
+          overflowY: 'auto', // Keep scrolling enabled for natural mobile behavior
+          WebkitOverflowScrolling: 'touch', // Maintain smooth iOS scrolling
           transition: smooth ? 'height 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
         });
 
@@ -359,8 +363,12 @@ export default function ChatPage() {
 
     document.addEventListener('touchend', handleTouchStart, false);
 
-    // Initial setup
-    setTimeout(handleKeyboardVisibility, 100);
+    // Initial setup - don't apply layout changes initially, let CSS handle natural mobile scrolling
+    // Only apply keyboard handling when keyboard actually appears
+    setTimeout(() => {
+      // Reset any potential layout changes from previous sessions
+      updateLayout(false, false);
+    }, 100);
 
     return () => {
       // Comprehensive cleanup
@@ -857,6 +865,7 @@ export default function ChatPage() {
 
 
   const fetchChats = async () => {
+    setLoadingChats(true);
     try {
       const res = await fetch("/api/messages");
       if (res.ok) {
@@ -865,10 +874,13 @@ export default function ChatPage() {
       }
     } catch (error) {
       console.error("Error fetching chats:", error);
+    } finally {
+      setLoadingChats(false);
     }
   };
 
   const fetchMessages = async (userId: string) => {
+    setLoadingMessages(true);
     try {
       const res = await fetch(`/api/messages/${userId}`);
       if (res.ok) {
@@ -877,6 +889,8 @@ export default function ChatPage() {
       }
     } catch (error) {
       console.error("Error fetching messages:", error);
+    } finally {
+      setLoadingMessages(false);
     }
   };
 
@@ -1399,7 +1413,8 @@ export default function ChatPage() {
     });
   };
 
-  if (status === "loading") {
+  // next-auth can return "loading" at runtime; types may only include "authenticated" | "unauthenticated"
+  if ((status as string) === "loading") {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
@@ -1441,7 +1456,7 @@ export default function ChatPage() {
         }`}>
           <div
             id="chat-container"
-            className={`mobile-chat-stable will-change-transform w-full ${
+            className={`mobile-chat-stable will-change-transform w-full h-full ${
               selectedChat
                 ? "flex flex-col lg:flex-row gap-0 lg:gap-6"
                 : "flex flex-col lg:flex-row gap-0 lg:gap-6"
@@ -1497,7 +1512,14 @@ export default function ChatPage() {
               </div>
 
               <div className="flex-1 overflow-y-auto custom-scrollbar">
-                {searchQuery && searchResults.length > 0 && (
+                {loadingChats ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
+                      <div className="text-sm text-gray-500">Loading conversations...</div>
+                    </div>
+                  </div>
+                ) : searchQuery && searchResults.length > 0 && (
                   <div className="p-2">
                     <p className="px-2 py-1 text-xs font-semibold text-gray-500 uppercase">Global Search Results</p>
                     {searchResults.map(user => (
@@ -1692,11 +1714,9 @@ export default function ChatPage() {
 
                   {/* Messages - Premium Mobile Optimized */}
                   <div
-                    className="chat-messages-container flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 lg:p-6 space-y-3 sm:space-y-4 bg-background/50 custom-scrollbar chat-messages-pc will-change-scroll lg:flex-none lg:h-full lg:max-h-[calc(100%-120px)]"
+                    className="chat-messages-container flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 lg:p-6 space-y-3 sm:space-y-4 bg-background/50 custom-scrollbar chat-messages-pc will-change-scroll"
                     style={{
                       overflowAnchor: 'auto',
-                      // Modern viewport units for better mobile support
-                      minHeight: 'calc(100dvh - 200px)', // Fallback minimum height
                       WebkitOverflowScrolling: 'touch', // Smooth iOS scrolling
                       scrollBehavior: 'smooth',
                       // Hardware acceleration for smooth scrolling
@@ -1704,13 +1724,31 @@ export default function ChatPage() {
                       transform: 'translateZ(0)',
                     }}
                   >
-                    <AnimatePresence>
-                      {messages.map((message, index) => {
+                    {status === "authenticated" && session?.user?.id ? (
+                      loadingMessages ? (
+                        <div className="flex items-center justify-center h-full">
+                          <div className="flex flex-col items-center gap-3">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
+                            <div className="text-sm text-gray-500">Loading messages...</div>
+                          </div>
+                        </div>
+                      ) : messages.length === 0 ? (
+                        <div className="flex items-center justify-center h-full">
+                          <div className="text-center text-gray-500">
+                            <div className="text-4xl mb-4">💬</div>
+                            <div className="text-lg font-medium mb-2">No messages yet</div>
+                            <div className="text-sm">Start a conversation by sending a message!</div>
+                          </div>
+                        </div>
+                      ) : (
+                        <AnimatePresence>
+                          {messages.map((message, index) => {
                         const isOwn = message.senderId === session?.user?.id;
                         const showAvatar = !isOwn && (
                           index === 0 ||
                           messages[index - 1]?.senderId !== message.senderId
                         );
+
 
                         return (
                           <MessageItem
@@ -1728,8 +1766,18 @@ export default function ChatPage() {
                             formatContent={formatMessageContent}
                           />
                         );
-                      })}
-                    </AnimatePresence>
+                        })}
+                        </AnimatePresence>
+                      )
+                    ) : (
+                      <div className="flex items-center justify-center h-full">
+                        <div className="text-center text-gray-500">
+                          <div className="text-4xl mb-4">🔐</div>
+                          <div className="text-lg font-medium mb-2">Authentication Required</div>
+                          <div className="text-sm">Please log in to view messages</div>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Typing Indicator - Enhanced & Stylish */}
                     {typingUsers.length > 0 && (

@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import QRCodeModal from "@/components/profile/QRCodeModal";
+import QRCodeScanner from "@/components/profile/QRCodeScanner";
 import {
   UserPlus,
   UserMinus,
@@ -23,6 +25,7 @@ import {
   Share2,
   Eye,
   Link as LinkIcon,
+  QrCode,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -94,6 +97,8 @@ export default function ProfileClient({
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("posts");
   const [userAvatar, setUserAvatar] = useState(user.image || user.avatar);
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [showQRScanner, setShowQRScanner] = useState(false);
   const [stats, setStats] = useState({
     totalLikes: 0,
     totalComments: 0,
@@ -323,38 +328,51 @@ export default function ProfileClient({
                   </div>
 
                   {/* Actions */}
-                  {!isOwnProfile && session?.user?.id !== user.id && (
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Button
-                        onClick={handleFollow}
-                        disabled={isLoading}
-                        variant={isFollowing ? "outline" : "primary"}
-                        size="default"
-                        className="flex-1 sm:flex-initial text-sm sm:text-base min-w-[100px]"
-                      >
-                        {isFollowing ? (
-                          <>
-                            <UserMinus className="h-4 w-4 mr-1.5 sm:mr-2 flex-shrink-0" />
-                            <span>Unfollow</span>
-                          </>
-                        ) : (
-                          <>
-                            <UserPlus className="h-4 w-4 mr-1.5 sm:mr-2 flex-shrink-0" />
-                            <span>Follow</span>
-                          </>
-                        )}
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="default" 
-                        onClick={() => router.push(`/chat?userId=${user.id}`)}
-                        className="flex-1 sm:flex-initial text-sm sm:text-base min-w-[100px]"
-                      >
-                        <Mail className="h-4 w-4 mr-1.5 sm:mr-2 flex-shrink-0" />
-                        <span>Message</span>
-                      </Button>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {!isOwnProfile && session?.user?.id !== user.id && (
+                      <>
+                        <Button
+                          onClick={handleFollow}
+                          disabled={isLoading}
+                          variant={isFollowing ? "outline" : "primary"}
+                          size="default"
+                          className="flex-1 sm:flex-initial text-sm sm:text-base min-w-[100px]"
+                        >
+                          {isFollowing ? (
+                            <>
+                              <UserMinus className="h-4 w-4 mr-1.5 sm:mr-2 flex-shrink-0" />
+                              <span>Unfollow</span>
+                            </>
+                          ) : (
+                            <>
+                              <UserPlus className="h-4 w-4 mr-1.5 sm:mr-2 flex-shrink-0" />
+                              <span>Follow</span>
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="default"
+                          onClick={() => router.push(`/chat?userId=${user.id}`)}
+                          className="flex-1 sm:flex-initial text-sm sm:text-base min-w-[100px]"
+                        >
+                          <Mail className="h-4 w-4 mr-1.5 sm:mr-2 flex-shrink-0" />
+                          <span>Message</span>
+                        </Button>
+                      </>
+                    )}
+
+                    {/* QR Code Button - Available for all profiles */}
+                    <Button
+                      variant="outline"
+                      size="default"
+                      onClick={() => setShowQRModal(true)}
+                      className="flex-1 sm:flex-initial text-sm sm:text-base min-w-[100px]"
+                    >
+                      <QrCode className="h-4 w-4 mr-1.5 sm:mr-2 flex-shrink-0" />
+                      <span>QR Code</span>
+                    </Button>
+                  </div>
                 </div>
               </div>
             </Card>
@@ -582,6 +600,22 @@ export default function ProfileClient({
           </Tabs>
         </div>
       </div>
+
+      {/* QR Code Modal */}
+      <QRCodeModal
+        isOpen={showQRModal}
+        onClose={() => setShowQRModal(false)}
+        profileUrl={`${window?.location?.origin}/profile/${user.username || user.id}`}
+        userName={user.name || user.username || "User"}
+        userAvatar={user.avatar}
+        onScan={() => setShowQRScanner(true)}
+      />
+
+      {/* QR Code Scanner */}
+      <QRCodeScanner
+        isOpen={showQRScanner}
+        onClose={() => setShowQRScanner(false)}
+      />
     </div>
   );
 }

@@ -345,25 +345,42 @@
 
   /* Mobile overrides */
   @media (max-width: 1023px) {
+    #chat-container {
+      /* Ensure full height on mobile for proper scrolling */
+      height: 100vh;
+      max-height: 100vh;
+    }
+
     .chat-window-card {
-      /* Mobile specific styling */
+      /* Mobile specific styling - allow natural height */
       position: relative;
       height: 100%;
-      max-height: calc(var(--vh, 1vh) * 100);
+      max-height: 100%;
       will-change: transform;
     }
 
-    .chat-messages-pc {
-      /* Mobile specific styling - dynamic height set by JS */
-      height: 100%;
-      /* Keep flex-1 behavior on mobile */
+    .chat-messages-container {
+      /* Mobile specific styling - natural flex behavior */
       flex: 1;
+      min-height: 0;
+      /* Allow natural scrolling without fixed heights */
+      height: auto;
       max-height: none;
+      /* Ensure proper scrolling */
+      overflow-y: auto;
+      overflow-x: hidden; /* Prevent horizontal scrolling */
+      -webkit-overflow-scrolling: touch;
+      /* Better mobile performance */
+      transform: translateZ(0);
+      -webkit-transform: translateZ(0);
+      /* Prevent content from being hidden behind keyboard */
+      padding-bottom: 1rem;
     }
 
     .chat-input-stable {
-      /* Mobile specific positioning */
+      /* Mobile specific positioning - natural flow */
       position: relative;
+      flex-shrink: 0;
     }
   }
 }
