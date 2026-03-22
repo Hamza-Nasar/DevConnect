@@ -3,6 +3,7 @@
 	"main": ".open-next/worker.js",
 	"name": "devconnect",
 	"compatibility_date": "2026-03-17",
+	"upload_source_maps": false,
 	"compatibility_flags": [
 		"nodejs_compat",
 		"global_fetch_strictly_public"
@@ -18,10 +19,5 @@
 			"binding": "WORKER_SELF_REFERENCE",
 			"service": "devconnect"
 		}
-	],
-	"images": {
-		// Enable image optimization
-		// see https://opennext.js.org/cloudflare/howtos/image
-		"binding": "IMAGES"
-	}
+	]
 }

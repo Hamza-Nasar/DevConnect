@@ -1,5 +1,10 @@
 import type { NextConfig } from "next";
 
+const isCloudflareBuild =
+  process.env.WORKERS_CI === "1" ||
+  process.env.CF_PAGES === "1" ||
+  (!!process.env.CLOUDFLARE_ACCOUNT_ID && !process.env.VERCEL);
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   // Force serverful deployment on Railway (not serverless)
@@ -10,6 +15,7 @@ const nextConfig: NextConfig = {
     },
   }),
   images: {
+    ...(isCloudflareBuild ? { unoptimized: true } : {}),
     remotePatterns: [
       {
         protocol: "https",
