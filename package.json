@@ -6,13 +6,14 @@
     "node": ">=20.9.0"
   },
   "scripts": {
-    "build": "next build && tsc --project tsconfig.server.json",
+    "build": "opennextjs-cloudflare build",
+    "build:app": "next build && tsc --project tsconfig.server.json",
     "dev": "ts-node --project tsconfig.server.json --transpile-only server.ts",
     "start": "cross-env NODE_ENV=production node dist/server.js",
     "lint": "next lint",
-    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
-    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
-    "upload": "opennextjs-cloudflare build && opennextjs-cloudflare upload",
+    "preview": "opennextjs-cloudflare preview",
+    "deploy": "opennextjs-cloudflare deploy",
+    "upload": "opennextjs-cloudflare upload",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts"
   },
   "dependencies": {
