@@ -3,11 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": ">=20.9.0"
+    "node": "22.x"
   },
   "scripts": {
-    "build": "opennextjs-cloudflare build",
+    "build": "node scripts/build.mjs",
     "build:app": "next build && tsc --project tsconfig.server.json",
+    "build:cf": "opennextjs-cloudflare build",
     "dev": "ts-node --project tsconfig.server.json --transpile-only server.ts",
     "start": "cross-env NODE_ENV=production node dist/server.js",
     "lint": "next lint",
