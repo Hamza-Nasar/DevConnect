@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import * as prettier from "prettier";
+import { normalizeCodeForDisplay } from "@/lib/ai/code-normalizer";
 
 export async function POST(req: NextRequest) {
     try {
@@ -15,40 +15,8 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Code required" }, { status: 400 });
         }
 
-        // Map common languages to Prettier parsers
-        const parserMap: Record<string, string> = {
-            javascript: "babel",
-            js: "babel",
-            typescript: "typescript",
-            ts: "typescript",
-            jsx: "babel",
-            tsx: "typescript",
-            css: "css",
-            html: "html",
-            json: "json",
-            markdown: "markdown",
-            md: "markdown",
-            yaml: "yaml",
-            yml: "yaml",
-        };
-
-        const parser = parserMap[language.toLowerCase()] || "babel";
-
-        try {
-            const formattedCode = await prettier.format(code, {
-                parser,
-                semi: true,
-                singleQuote: false,
-                tabWidth: 2,
-                trailingComma: "es5",
-                printWidth: 80,
-            });
-            return NextResponse.json({ formattedCode });
-        } catch (prettierError: any) {
-            console.warn("Prettier formatting failed:", prettierError.message);
-            // Fallback to original code if formatting fails (e.g., syntax error)
-            return NextResponse.json({ formattedCode: code, warning: prettierError.message });
-        }
+        const { formattedCode, warning } = normalizeCodeForDisplay(code, language);
+        return NextResponse.json({ formattedCode, warning });
     } catch (error: any) {
         console.error("Error formatting code:", error);
         return NextResponse.json(
