@@ -7,7 +7,7 @@
   },
   "scripts": {
     "build": "node scripts/build.mjs",
-    "build:app": "next build && tsc --project tsconfig.server.json",
+    "build:app": "next build --webpack && tsc --project tsconfig.server.json",
     "build:cf": "opennextjs-cloudflare build",
     "dev": "ts-node --project tsconfig.server.json --transpile-only server.ts",
     "start": "cross-env NODE_ENV=production node dist/server.js",
