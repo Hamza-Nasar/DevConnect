@@ -3,6 +3,7 @@
 	"main": ".open-next/worker.js",
 	"name": "devconnect",
 	"compatibility_date": "2026-03-17",
+	"minify": true,
 	"upload_source_maps": false,
 	"compatibility_flags": [
 		"nodejs_compat",
