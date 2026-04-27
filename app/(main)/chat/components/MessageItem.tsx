@@ -68,10 +68,10 @@ export default function MessageItem({
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9 }}
-            className={`group flex w-full ${isOwn ? "justify-end" : "justify-start"} mb-2 px-2 sm:px-4 relative`}
+            className={`group flex w-full min-w-0 ${isOwn ? "justify-end" : "justify-start"} mb-2 px-1 sm:px-4 relative`}
         >
             <div
-                className={`flex items-end gap-2 max-w-[90%] sm:max-w-[85%] lg:max-w-[75%] ${isOwn ? "flex-row-reverse" : "flex-row"}`}
+                className={`flex min-w-0 items-end gap-2 max-w-[88%] sm:max-w-[85%] lg:max-w-[75%] ${isOwn ? "flex-row-reverse" : "flex-row"}`}
                 onTouchStart={handleTouchStart}
                 onTouchEnd={handleTouchEnd}
                 onMouseDown={handleTouchStart}
@@ -89,7 +89,7 @@ export default function MessageItem({
                 )}
                 {!showAvatar && !isOwn && <div className="w-8 flex-shrink-0" />}
 
-                <div className="flex flex-col gap-1 relative">
+                <div className="flex min-w-0 flex-col gap-1 relative">
                     {/* Reaction Overlay (Quick Select) */}
                     <AnimatePresence>
                         {(showReactions || isLongPressed) && (
@@ -97,7 +97,7 @@ export default function MessageItem({
                                 initial={{ opacity: 0, y: 10, scale: 0.9 }}
                                 animate={{ opacity: 1, y: -45, scale: 1 }}
                                 exit={{ opacity: 0, y: 10, scale: 0.9 }}
-                                className={`absolute ${isOwn ? "right-0" : "left-0"} z-50 bg-gray-800 border border-gray-700 rounded-full p-1 shadow-xl flex gap-1`}
+                                className={`absolute ${isOwn ? "right-0" : "left-0"} z-50 max-w-[calc(100vw-1.5rem)] overflow-x-auto bg-gray-800 border border-gray-700 rounded-full p-1 shadow-xl flex gap-1`}
                             >
                                 {COMMON_EMOJIS.map(emoji => (
                                     <button
@@ -126,7 +126,7 @@ export default function MessageItem({
 
                     {/* Media Content */}
                     {message.type === "image" && message.imageUrl && (
-                        <div className="rounded-2xl overflow-hidden max-w-xs mb-1 shadow-lg">
+                        <div className="rounded-2xl overflow-hidden max-w-full sm:max-w-xs mb-1 shadow-lg">
                             <img
                                 src={message.imageUrl}
                                 alt="Shared"
@@ -137,13 +137,13 @@ export default function MessageItem({
                     )}
 
                     {message.type === "video" && message.videoUrl && (
-                        <div className="rounded-2xl overflow-hidden max-w-xs mb-1 shadow-lg">
+                        <div className="rounded-2xl overflow-hidden max-w-full sm:max-w-xs mb-1 shadow-lg">
                             <video src={message.videoUrl} controls className="w-full max-h-64" />
                         </div>
                     )}
 
                     {message.type === "file" && (
-                        <div className="flex items-center gap-3 p-3 bg-gray-800/80 rounded-2xl mb-1 border border-gray-700">
+                        <div className="flex min-w-0 max-w-full items-center gap-3 p-3 bg-gray-800/80 rounded-2xl mb-1 border border-gray-700">
                             <FileText className="h-6 w-6 text-blue-400" />
                             <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium text-white truncate">{message.fileName}</p>
@@ -154,13 +154,13 @@ export default function MessageItem({
 
                     {/* Message Bubble */}
                     <div
-                        className={`relative rounded-2xl px-4 py-2.5 transition-all max-w-xs sm:max-w-sm lg:max-w-md ${isOwn
+                        className={`relative max-w-full rounded-2xl px-3.5 py-2.5 transition-all break-words sm:px-4 ${isOwn
                             ? "bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-br-md rounded-bl-2xl rounded-tr-2xl rounded-tl-md shadow-lg"
                             : "bg-gray-800 text-gray-100 rounded-bl-md rounded-br-2xl rounded-tr-2xl rounded-tl-md border border-gray-700/50 shadow-md"
                             } ${isLongPressed ? "ring-2 ring-purple-500 scale-[0.98]" : ""}`}
                     >
                         {message.type === "text" && (
-                            <div className="text-sm prose prose-invert max-w-none">
+                            <div className="text-sm prose prose-invert max-w-none [overflow-wrap:anywhere] [&_*]:max-w-full">
                                 {formatContent(message.content)}
                             </div>
                         )}
@@ -182,7 +182,7 @@ export default function MessageItem({
                         </div>
 
                         {/* Actions Menu Trigger - Desktop (Hover) & Mobile (Long Press Indicator) */}
-                        <div className={`absolute top-1/2 -translate-y-1/2 ${isOwn ? "right-full mr-2" : "left-full ml-2"} flex items-center gap-1 ${isLongPressed ? "opacity-100" : "opacity-0 group-hover:opacity-100"} transition-opacity`}>
+                        <div className={`absolute top-1/2 -translate-y-1/2 ${isOwn ? "right-full mr-2" : "left-full ml-2"} hidden items-center gap-1 sm:flex ${isLongPressed ? "opacity-100" : "opacity-0 group-hover:opacity-100"} transition-opacity`}>
                             <Button
                                 variant="ghost"
                                 size="icon"

@@ -1,30 +1,22 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.initializeSocket = initializeSocket;
 const socket_io_1 = require("socket.io");
-const mongodb_1 = require("../lib/mongodb");
-const db_1 = require("../lib/db");
+const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
+const jwt_1 = require("next-auth/jwt");
 const socket_server_1 = require("../lib/socket-server");
-const db_2 = require("../lib/db");
+const database_index_service_1 = require("../services/database-index.service");
+const user_service_1 = require("../services/user.service");
+const message_socket_1 = require("../sockets/message.socket");
+const post_socket_1 = require("../sockets/post.socket");
+const user_socket_1 = require("../sockets/user.socket");
 function initializeSocket(server) {
-    // Get allowed origins from environment or use default
-    const getAllowedOrigins = () => {
-        const allowedOrigins = process.env.ALLOWED_ORIGINS;
-        if (allowedOrigins) {
-            // Split by comma and trim
-            return allowedOrigins.split(',').map(origin => origin.trim());
-        }
-        // In production, allow common origins
-        if (process.env.NODE_ENV === 'production') {
-            return [
-                process.env.NEXTAUTH_URL || '',
-                process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '',
-                process.env.FRONTEND_URL || '',
-            ].filter(Boolean);
-        }
-        // In development, allow all origins
-        return true;
-    };
+    void (0, database_index_service_1.ensureDatabaseIndexes)().catch((error) => {
+        console.error("[DB] Failed to initialize indexes:", error);
+    });
     const io = new socket_io_1.Server(server, {
         cors: {
             origin: getAllowedOrigins(),
@@ -32,716 +24,191 @@ function initializeSocket(server) {
             credentials: true,
             allowedHeaders: ["Content-Type", "Authorization", "Cookie"],
         },
-        // Use default Socket.IO path for Railway compatibility
         path: "/socket.io",
         addTrailingSlash: false,
-        transports: ["websocket", "polling"], // Allow both WebSocket and polling
+        transports: ["websocket", "polling"],
         allowEIO3: false,
         pingTimeout: 20000,
         pingInterval: 10000,
         connectTimeout: 15000,
-        maxHttpBufferSize: 1e6, // 1MB
+        maxHttpBufferSize: 1e6,
         cookie: false,
     });
-    // Make socket instance globally accessible
     (0, socket_server_1.setSocketInstance)(io);
-    // Store user socket connections: userId -> Set of socketIds
     const userSockets = new Map();
-    // Track OAuth ID for each MongoDB ID (dbId -> oauthId)
     const userIdMapping = new Map();
-    // Helper: resolve a userId to all possible room names (handles ID mismatch between OAuth/DB)
-    const getUserRooms = async (userId) => {
-        const rooms = new Set();
-        rooms.add(`user:${userId}`);
-        console.log(`🔎 [Server] getUserRooms called for: ${userId}`);
-        try {
-            const usersCollection = await (0, mongodb_1.getCollection)(db_1.COLLECTIONS.USERS);
-            const userIdObj = (0, db_1.toObjectId)(userId);
-            console.log(`🔎 [Server] Converted to ObjectId: ${userIdObj ? 'yes' : 'no (using string lookup)'}`);
-            const user = userIdObj
-                ? await usersCollection.findOne({ _id: userIdObj })
-                : await usersCollection.findOne({ id: userId });
-            if (user) {
-                const dbId = user._id.toString();
-                const oauthId = user.id;
-                rooms.add(`user:${dbId}`);
-                if (oauthId)
-                    rooms.add(`user:${oauthId}`);
-                console.log(`✅ [Server] getUserRooms found user: DB=${dbId}, OAuth=${oauthId}`);
-            }
-            else {
-                console.log(`⚠️ [Server] getUserRooms: User NOT found in DB for ${userId}`);
-            }
-        }
-        catch (error) {
-            console.error(`❌ [Server] getUserRooms error for ${userId}:`, error);
-        }
-        console.log(`📋 [Server] getUserRooms returning ${rooms.size} rooms: ${Array.from(rooms).join(", ")}`);
-        return Array.from(rooms);
-    };
-    // Helper: emit event directly to all socket IDs for a user (bypasses room routing)
-    const emitToUser = async (userId, event, data) => {
-        console.log(`📤 [Server] emitToUser: ${event} to ${userId}`);
-        // Try to resolve to MongoDB _id first
-        const usersCollection = await (0, mongodb_1.getCollection)(db_1.COLLECTIONS.USERS);
-        const userIdObj = (0, db_1.toObjectId)(userId);
-        const user = userIdObj
-            ? await usersCollection.findOne({ _id: userIdObj })
-            : await usersCollection.findOne({ id: userId });
-        const possibleDbIds = [userId];
-        if (user) {
-            const dbId = user._id.toString();
-            const oauthId = user.id;
-            if (dbId && !possibleDbIds.includes(dbId))
-                possibleDbIds.push(dbId);
-            if (oauthId && !possibleDbIds.includes(oauthId))
-                possibleDbIds.push(oauthId);
-        }
-        let emitted = 0;
-        for (const id of possibleDbIds) {
-            const socketIds = userSockets.get(id);
-            if (socketIds) {
+    const context = {
+        io,
+        userSockets,
+        userIdMapping,
+        emitToUser: async (userId, event, data) => {
+            const possibleIds = await (0, user_service_1.getUserIdentityVariants)(userId);
+            let emitted = 0;
+            for (const id of possibleIds) {
+                const socketIds = userSockets.get(id);
+                if (!socketIds)
+                    continue;
                 for (const socketId of socketIds) {
                     const targetSocket = io.sockets.sockets.get(socketId);
-                    if (targetSocket) {
-                        targetSocket.emit(event, data);
-                        emitted++;
-                        console.log(`📤 [Server] Emitted ${event} to socket ${socketId} (user: ${id})`);
-                    }
+                    if (!targetSocket)
+                        continue;
+                    targetSocket.emit(event, data);
+                    emitted++;
                 }
             }
-        }
-        console.log(`📤 [Server] emitToUser: sent to ${emitted} sockets for user ${userId}`);
-        return emitted;
-    };
-    console.log("🚀 Socket.IO Server Initialized");
-    console.log("📊 Socket.IO Configuration:", {
-        path: "/socket.io",
-        transports: ["websocket", "polling"],
-        pingTimeout: 20000,
-        pingInterval: 10000,
-        cors: getAllowedOrigins() === true ? "all origins" : getAllowedOrigins(),
-        timestamp: new Date().toISOString()
-    });
-    // Add health check for WebSocket connections
-    io.on("connection", (socket) => {
-        console.log(`🔌 [Health] New connection: ${socket.id}`);
-        // Send immediate health check
-        socket.emit("health_check", { status: "ok", timestamp: Date.now() });
-        socket.on("health_check_response", (data) => {
-            console.log(`💚 [Health] Client ${socket.id} responded:`, data);
-        });
-    });
-    io.on("connection", (socket) => {
-        console.log(`🔌 [Server] New WebSocket connection: ${socket.id} from ${socket.handshake.address}`);
-        socket.on("ping_heartbeat", () => {
-            socket.emit("pong_heartbeat");
-        });
-        socket.on("connect_error", (error) => {
-            console.error(`❌ [Server] Socket ${socket.id} connection error:`, error.message);
-        });
-        socket.on("error", (error) => {
-            console.error(`❌ [Server] Socket ${socket.id} error:`, error);
-        });
-        socket.on("join", async (userId) => {
-            if (!userId)
-                return;
-            try {
-                const usersCollection = await (0, mongodb_1.getCollection)(db_1.COLLECTIONS.USERS);
-                const userIdObj = (0, db_1.toObjectId)(userId);
-                // Find user by either ID
-                const user = userIdObj
-                    ? await usersCollection.findOne({ _id: userIdObj })
-                    : await usersCollection.findOne({ id: userId });
-                if (user) {
-                    const dbId = user._id.toString();
-                    const oauthId = user.id;
-                    // Normalize socket session ID to MongoDB _id
-                    socket.userId = dbId;
-                    socket.oauthId = oauthId;
-                    // Store socket under BOTH IDs for reliable lookup
-                    if (!userSockets.has(dbId)) {
-                        userSockets.set(dbId, new Set());
-                    }
-                    userSockets.get(dbId).add(socket.id);
-                    // ALSO store under OAuth ID if different
-                    if (oauthId && oauthId !== dbId) {
-                        if (!userSockets.has(oauthId)) {
-                            userSockets.set(oauthId, new Set());
-                        }
-                        userSockets.get(oauthId).add(socket.id);
-                    }
-                    // Track the ID mapping so we can return both variants to clients
-                    if (oauthId) {
-                        userIdMapping.set(dbId, oauthId);
-                    }
-                    // Join primary rooms for all variations
-                    socket.join(`user:${dbId}`);
-                    if (oauthId && oauthId !== dbId) {
-                        socket.join(`user:${oauthId}`);
-                    }
-                    // Also join specific user ID passed to be safe
-                    if (userId !== dbId && userId !== oauthId) {
-                        socket.join(`user:${userId}`);
-                    }
-                    console.log(`👤 [Server] User ${userId} (DB: ${dbId}, OAuth: ${oauthId}) joined rooms. Total sockets: ${userSockets.get(dbId).size}`);
-                    // Mark online in DB if it was offline
-                    if (!user.isOnline) {
-                        await usersCollection.updateOne({ _id: user._id }, { $set: { isOnline: true, lastSeen: new Date() } });
-                    }
-                    // Broadcast status for BOTH IDs
-                    io.emit("user_status", { userId: dbId, status: "online", lastSeen: null });
-                    if (oauthId && oauthId !== dbId) {
-                        io.emit("user_status", { userId: oauthId, status: "online", lastSeen: null });
-                    }
-                    // Send list of CURRENT online users to the joining user (include both ID variants)
-                    const onlineIds = [];
-                    for (const dbId of userSockets.keys()) {
-                        onlineIds.push(dbId);
-                        const oauthId = userIdMapping.get(dbId);
-                        if (oauthId && oauthId !== dbId)
-                            onlineIds.push(oauthId);
-                    }
-                    socket.emit("initial_online_users", onlineIds);
-                }
-                else {
-                    // Fallback if user not found in DB yet (rare but possible during first login)
-                    socket.userId = userId;
-                    socket.join(`user:${userId}`);
-                    if (!userSockets.has(userId)) {
-                        userSockets.set(userId, new Set());
-                    }
-                    userSockets.get(userId).add(socket.id);
-                    console.log(`👤 [Server] User ${userId} (Not in DB yet) joined rooms.`);
-                    await usersCollection.updateOne({ _id: (userIdObj || userId) }, // Maintaining any here as it's the safest way to mix string/ObjectId for MongoDB Filter
-                    { $set: { isOnline: true, lastSeen: new Date() } }, { upsert: false });
-                    io.emit("user_status", { userId, status: "online", lastSeen: null });
-                    // Send list of CURRENT online users to the joining user (include both ID variants)
-                    const onlineIdsForFallback = [];
-                    for (const dbId of userSockets.keys()) {
-                        onlineIdsForFallback.push(dbId);
-                        const mappedOauthId = userIdMapping.get(dbId);
-                        if (mappedOauthId && mappedOauthId !== dbId)
-                            onlineIdsForFallback.push(mappedOauthId);
-                    }
-                    socket.emit("initial_online_users", onlineIdsForFallback);
-                }
-            }
-            catch (error) {
-                console.error(`❌ [Server] Join error for ${userId}:`, error);
-            }
-        });
-        socket.on("get_online_users", () => {
-            // Return both ID variants so clients can match users regardless of ID format
-            const onlineIds = [];
+            return emitted;
+        },
+        getOnlineUserIds: () => {
+            const ids = [];
             for (const dbId of userSockets.keys()) {
-                onlineIds.push(dbId);
+                ids.push(dbId);
                 const oauthId = userIdMapping.get(dbId);
                 if (oauthId && oauthId !== dbId)
-                    onlineIds.push(oauthId);
+                    ids.push(oauthId);
             }
-            console.log(`👥 [Server] Sending online users to ${socket.id}: ${onlineIds.length} IDs`);
-            socket.emit("initial_online_users", onlineIds);
-        });
-        // Video/Voice Call Signaling - UPDATED to use direct socket emission
-        socket.on("call_user", async (data) => {
-            console.log(`📞 [Server] Call: ${data.from} → ${data.userToCall}`);
-            const callData = {
-                signal: data.signalData,
-                from: data.from,
-                name: data.name,
-                avatar: data.avatar,
-                isVideo: data.isVideo
-            };
-            const count = await emitToUser(data.userToCall, "call_user", callData);
-            console.log(`✅ [Server] Call event emitted to ${count} sockets`);
-        });
-        socket.on("answer_call", async (data) => {
-            console.log(`✅ Call answered, signal sent to ${data.to}`);
-            await emitToUser(data.to, "call_accepted", data.signal);
-        });
-        socket.on("end_call", async (data) => {
-            console.log(`📴 Call ended with ${data.to}`);
-            await emitToUser(data.to, "call_ended", {});
-        });
-        // Join post room for real-time updates
-        socket.on("join_post", (postId) => {
-            socket.join(`post:${postId}`);
-            console.log(`📝 Joined post room: ${postId}`);
-        });
-        // Leave post room
-        socket.on("leave_post", (postId) => {
-            socket.leave(`post:${postId}`);
-        });
-        // Group room handlers
-        socket.on("join_group", (groupId) => {
-            socket.join(`group:${groupId}`);
-            console.log(`👥 [Server] User ${socket.userId} joined group room: ${groupId}`);
-        });
-        socket.on("leave_group", (groupId) => {
-            socket.leave(`group:${groupId}`);
-            console.log(`👥 [Server] User ${socket.userId} left group room: ${groupId}`);
-        });
-        // Group share and report events
-        socket.on("share_group", (data) => {
-            console.log(`🔗 [Server] Group shared: ${data.groupName} by ${data.userId}`);
-            // Emit to group room to notify other members
-            socket.to(`group:${data.groupId}`).emit("group_shared", data);
-        });
-        socket.on("report_group", (data) => {
-            console.log(`🚨 [Server] Group reported: ${data.groupName} by ${data.userId}`);
-            // Emit to group room (admins only) or just log for moderation
-            socket.to(`group:${data.groupId}`).emit("group_reported", data);
-        });
-        // Handle post view - broadcast to all users viewing this post
-        socket.on("post_view", (data) => {
-            io.to(`post:${data.postId}`).emit("views_updated", {
-                postId: data.postId,
-                viewsCount: data.viewsCount,
-            });
-        });
-        // Join conversation room
-        socket.on("join_conversation", (conversationId) => {
-            socket.join(`conversation:${conversationId}`);
-            console.log(`💬 Joined conversation: ${conversationId}`);
-        });
-        // Leave conversation room
-        socket.on("leave_conversation", (conversationId) => {
-            socket.leave(`conversation:${conversationId}`);
-        });
-        // WebRTC Live Streaming Events
-        socket.on("join_stream", ({ streamId, isHost }) => {
-            var _a;
-            const room = `stream:${streamId}`;
-            socket.join(room);
-            if (isHost) {
-                console.log(`📹 Host joined stream: ${streamId}`);
+            return ids;
+        },
+        registerUserSocket: async (socket) => {
+            var _a, _b;
+            const user = await (0, user_service_1.markUserOnline)(socket.userId);
+            const dbId = ((_b = (_a = user === null || user === void 0 ? void 0 : user._id) === null || _a === void 0 ? void 0 : _a.toString) === null || _b === void 0 ? void 0 : _b.call(_a)) || socket.userId;
+            const oauthId = (user === null || user === void 0 ? void 0 : user.id) || socket.oauthId;
+            socket.userId = dbId;
+            socket.oauthId = oauthId;
+            addSocketForUser(userSockets, dbId, socket.id);
+            socket.join(`user:${dbId}`);
+            if (oauthId && oauthId !== dbId) {
+                addSocketForUser(userSockets, oauthId, socket.id);
+                userIdMapping.set(dbId, oauthId);
+                socket.join(`user:${oauthId}`);
             }
-            else {
-                console.log(`👁️ Viewer joined stream: ${streamId}`);
-                // Notify host about new viewer
-                io.to(room).emit("viewer_count", ((_a = io.sockets.adapter.rooms.get(room)) === null || _a === void 0 ? void 0 : _a.size) || 0);
+            io.emit("user_status", { userId: dbId, status: "online", lastSeen: null });
+            if (oauthId && oauthId !== dbId) {
+                io.emit("user_status", { userId: oauthId, status: "online", lastSeen: null });
             }
-        });
-        socket.on("leave_stream", ({ streamId }) => {
-            var _a;
-            const room = `stream:${streamId}`;
-            socket.leave(room);
-            io.to(room).emit("viewer_count", ((_a = io.sockets.adapter.rooms.get(room)) === null || _a === void 0 ? void 0 : _a.size) || 0);
-        });
-        socket.on("offer", ({ streamId, offer }) => {
-            const room = `stream:${streamId}`;
-            socket.to(room).emit("offer", { offer, from: socket.id });
-        });
-        socket.on("answer", ({ streamId, answer }) => {
-            const room = `stream:${streamId}`;
-            socket.to(room).emit("answer", { answer });
-        });
-        socket.on("ice-candidate", ({ streamId, candidate }) => {
-            const room = `stream:${streamId}`;
-            socket.to(room).emit("ice-candidate", { candidate });
-        });
-        socket.on("stream_like", ({ streamId }) => {
-            const room = `stream:${streamId}`;
-            io.to(room).emit("stream_like");
-        });
-        socket.on("stream_comment", ({ streamId, user, message }) => {
-            const room = `stream:${streamId}`;
-            io.to(room).emit("stream_comment", { user, message });
-        });
-        // Handle new post
-        socket.on("new_post", async (data) => {
-            try {
-                const postsCollection = await (0, mongodb_1.getCollection)(db_1.COLLECTIONS.POSTS);
-                const usersCollection = await (0, mongodb_1.getCollection)(db_1.COLLECTIONS.USERS);
-                const followsCollection = await (0, mongodb_1.getCollection)(db_1.COLLECTIONS.FOLLOWS);
-                const postId = (0, db_1.toObjectId)(data.postId);
-                const userId = (0, db_1.toObjectId)(data.userId);
-                if (!postId || !userId)
-                    return;
-                const post = await postsCollection.findOne({ _id: postId });
-                if (post) {
-                    const user = await usersCollection.findOne({ _id: userId });
-                    // Get user's followers
-                    const followers = await followsCollection
-                        .find({ followingId: data.userId })
-                        .toArray();
-                    const postData = Object.assign(Object.assign({}, post), { id: (0, db_1.toStringId)(post._id), user: {
-                            id: (0, db_1.toStringId)(user === null || user === void 0 ? void 0 : user._id),
-                            name: (user === null || user === void 0 ? void 0 : user.name) || null,
-                            username: (user === null || user === void 0 ? void 0 : user.username) || null,
-                            avatar: (user === null || user === void 0 ? void 0 : user.avatar) || (user === null || user === void 0 ? void 0 : user.image) || null,
-                            image: (user === null || user === void 0 ? void 0 : user.image) || (user === null || user === void 0 ? void 0 : user.avatar) || null,
-                            verified: (user === null || user === void 0 ? void 0 : user.verified) || false,
-                        }, likesCount: post.likesCount || 0, commentsCount: post.commentsCount || 0, sharesCount: post.sharesCount || 0, viewsCount: post.viewsCount || 0, bookmarksCount: post.bookmarksCount || 0 });
-                    // Broadcast to all users (real-time feed update)
-                    io.emit("new_post", postData);
-                    // Notify all followers specifically
-                    followers.forEach((follow) => {
-                        const f = follow;
-                        io.to(`user:${f.followerId}`).emit("new_post", postData);
-                    });
-                    // Also notify the poster
-                    io.to(`user:${data.userId}`).emit("post_created", postData);
-                }
-            }
-            catch (error) {
-                console.error("Error handling new_post:", error);
-            }
-        });
-        // Handle new comment
-        socket.on("new_comment", async (data) => {
-            try {
-                const commentsCollection = await (0, mongodb_1.getCollection)(db_1.COLLECTIONS.COMMENTS);
-                const postsCollection = await (0, mongodb_1.getCollection)(db_1.COLLECTIONS.POSTS);
-                const usersCollection = await (0, mongodb_1.getCollection)(db_1.COLLECTIONS.USERS);
-                const notificationsCollection = await (0, mongodb_1.getCollection)(db_1.COLLECTIONS.NOTIFICATIONS);
-                const commentId = (0, db_1.toObjectId)(data.commentId);
-                const postId = (0, db_1.toObjectId)(data.postId);
-                const userId = (0, db_1.toObjectId)(data.userId);
-                if (!commentId || !postId || !userId)
-                    return;
-                const comment = await commentsCollection.findOne({ _id: commentId });
-                if (comment) {
-                    const post = await postsCollection.findOne({ _id: postId });
-                    const user = await usersCollection.findOne({ _id: userId });
-                    const commentData = Object.assign(Object.assign({}, comment), { id: (0, db_1.toStringId)(comment._id), user: {
-                            id: (0, db_1.toStringId)(user === null || user === void 0 ? void 0 : user._id),
-                            name: (user === null || user === void 0 ? void 0 : user.name) || null,
-                            username: (user === null || user === void 0 ? void 0 : user.username) || null,
-                            avatar: (user === null || user === void 0 ? void 0 : user.avatar) || null,
-                            image: (user === null || user === void 0 ? void 0 : user.image) || (user === null || user === void 0 ? void 0 : user.avatar) || null,
-                        } });
-                    // Notify post owner
-                    if (post && post.userId !== data.userId) {
-                        io.to(`user:${post.userId}`).emit("new_comment", commentData);
-                        // Create notification
-                        const notification = {
-                            userId: post.userId,
-                            actorId: data.userId,
-                            type: "comment",
-                            title: "New Comment",
-                            message: `${(user === null || user === void 0 ? void 0 : user.name) || "Someone"} commented on your post`,
-                            link: `/feed?post=${data.postId}`,
-                            read: false,
-                            createdAt: new Date(),
-                        };
-                        const notifResult = await (0, db_2.createNotification)(notification);
-                        // Emit generic notification event
-                        if (notifResult) {
-                            io.to(`user:${post.userId}`).emit("notification", Object.assign(Object.assign({}, notification), { _id: notifResult._id.toString(), id: notifResult._id.toString() }));
-                        }
-                    }
-                    // Get updated comments count
-                    const updatedPost = await postsCollection.findOne({ _id: postId });
-                    const commentsCount = (updatedPost === null || updatedPost === void 0 ? void 0 : updatedPost.commentsCount) || 0;
-                    // Broadcast to all users viewing this post
-                    io.to(`post:${data.postId}`).emit("comment_added", {
-                        postId: data.postId,
-                        commentsCount,
-                        comment: commentData,
-                    });
-                }
-            }
-            catch (error) {
-                console.error("Error handling new_comment:", error);
-            }
-        });
-        // Handle comment deletion
-        socket.on("delete_comment", async (data) => {
-            try {
-                const postsCollection = await (0, mongodb_1.getCollection)(db_1.COLLECTIONS.POSTS);
-                const commentsCollection = await (0, mongodb_1.getCollection)(db_1.COLLECTIONS.COMMENTS);
-                const postId = (0, db_1.toObjectId)(data.postId);
-                if (!postId)
-                    return;
-                // Delete comment
-                const commentIdObj = (0, db_1.toObjectId)(data.commentId);
-                if (commentIdObj) {
-                    await commentsCollection.deleteOne({ _id: commentIdObj });
-                }
-                // Update post comments count
-                await postsCollection.updateOne({ _id: postId }, { $inc: { commentsCount: -1 } });
-                const updatedPost = await postsCollection.findOne({ _id: postId });
-                const commentsCount = (updatedPost === null || updatedPost === void 0 ? void 0 : updatedPost.commentsCount) || 0;
-                // Broadcast to all users viewing this post
-                io.to(`post:${data.postId}`).emit("comment_deleted", {
-                    postId: data.postId,
-                    commentId: data.commentId,
-                    commentsCount,
-                });
-            }
-            catch (error) {
-                console.error("Error handling delete_comment:", error);
-            }
-        });
-        // Handle like
-        socket.on("like_post", async (data) => {
-            try {
-                const postsCollection = await (0, mongodb_1.getCollection)(db_1.COLLECTIONS.POSTS);
-                const notificationsCollection = await (0, mongodb_1.getCollection)(db_1.COLLECTIONS.NOTIFICATIONS);
-                const postId = (0, db_1.toObjectId)(data.postId);
-                if (!postId)
-                    return;
-                const post = await postsCollection.findOne({ _id: postId });
-                if (post && data.liked && post.userId !== data.userId) {
-                    // Create notification for post owner
-                    const notification = {
-                        userId: post.userId,
-                        actorId: data.userId,
-                        type: "like",
-                        title: "New Like",
-                        message: "Someone liked your post",
-                        link: `/feed?post=${data.postId}`,
-                        read: false,
-                        createdAt: new Date(),
-                    };
-                    const notifResult = await (0, db_2.createNotification)(notification);
-                    // Emit generic notification event
-                    if (notifResult) {
-                        io.to(`user:${post.userId}`).emit("notification", Object.assign(Object.assign({}, notification), { _id: notifResult._id.toString(), id: notifResult._id.toString() }));
-                    }
-                    io.to(`user:${post.userId}`).emit("post_liked", { postId: data.postId, liked: data.liked });
-                }
-                // Get updated like count
-                const updatedPost = await postsCollection.findOne({ _id: postId });
-                const likesCount = (updatedPost === null || updatedPost === void 0 ? void 0 : updatedPost.likesCount) || 0;
-                // Broadcast to all users viewing this post
-                io.to(`post:${data.postId}`).emit("like_updated", {
-                    postId: data.postId,
-                    liked: data.liked,
-                    userId: data.userId,
-                    likesCount,
-                });
-            }
-            catch (error) {
-                console.error("Error handling like_post:", error);
-            }
-        });
-        // Handle share
-        socket.on("share_post", async (data) => {
-            try {
-                const postsCollection = await (0, mongodb_1.getCollection)(db_1.COLLECTIONS.POSTS);
-                const notificationsCollection = await (0, mongodb_1.getCollection)(db_1.COLLECTIONS.NOTIFICATIONS);
-                const postId = (0, db_1.toObjectId)(data.postId);
-                if (!postId)
-                    return;
-                const post = await postsCollection.findOne({ _id: postId });
-                if (post && post.userId !== data.userId) {
-                    const notification = {
-                        userId: post.userId,
-                        actorId: data.userId,
-                        type: "share",
-                        title: "Post Shared",
-                        message: "Someone shared your post",
-                        link: `/feed?post=${data.postId}`,
-                        read: false,
-                        createdAt: new Date(),
-                    };
-                    const notifResult = await (0, db_2.createNotification)(notification);
-                    // Emit generic notification event
-                    if (notifResult) {
-                        io.to(`user:${post.userId}`).emit("notification", Object.assign(Object.assign({}, notification), { _id: notifResult._id.toString(), id: notifResult._id.toString() }));
-                    }
-                    io.to(`user:${post.userId}`).emit("post_shared", { postId: data.postId });
-                }
-                // Get updated share count
-                const updatedPost = await postsCollection.findOne({ _id: postId });
-                const sharesCount = (updatedPost === null || updatedPost === void 0 ? void 0 : updatedPost.sharesCount) || 0;
-                io.to(`post:${data.postId}`).emit("share_updated", {
-                    postId: data.postId,
-                    sharesCount
-                });
-            }
-            catch (error) {
-                console.error("Error handling share_post:", error);
-            }
-        });
-        // Handle bookmark
-        socket.on("bookmark_post", async (data) => {
-            try {
-                const postsCollection = await (0, mongodb_1.getCollection)(db_1.COLLECTIONS.POSTS);
-                const bookmarksCollection = await (0, mongodb_1.getCollection)("bookmarks");
-                const postId = (0, db_1.toObjectId)(data.postId);
-                if (!postId)
-                    return;
-                // Update bookmark count
-                const bookmarksCount = await bookmarksCollection.countDocuments({ postId: data.postId });
-                await postsCollection.updateOne({ _id: postId }, { $set: { bookmarksCount } });
-                const updatedPost = await postsCollection.findOne({ _id: postId });
-                const finalBookmarksCount = (updatedPost === null || updatedPost === void 0 ? void 0 : updatedPost.bookmarksCount) || 0;
-                io.to(`post:${data.postId}`).emit("bookmark_updated", {
-                    postId: data.postId,
-                    userId: data.userId,
-                    bookmarked: data.bookmarked,
-                    bookmarksCount: finalBookmarksCount,
-                });
-            }
-            catch (error) {
-                console.error("Error handling bookmark_post:", error);
-            }
-        });
-        // Handle avatar update
-        socket.on("avatar_updated", (data) => {
-            console.log(`🖼️ Avatar updated for user ${data.userId}`);
-            io.emit("avatar_changed", {
-                userId: data.userId,
-                avatar: data.avatar,
-            });
-        });
-        // Handle profile update
-        socket.on("profile_updated", (data) => {
-            console.log(`👤 Profile updated for user ${data.userId}`);
-            io.emit("profile_changed", {
-                userId: data.userId,
-                profile: data.profile,
-            });
-        });
-        // Handle follow
-        socket.on("follow_user", async (data) => {
-            try {
-                const notificationsCollection = await (0, mongodb_1.getCollection)(db_1.COLLECTIONS.NOTIFICATIONS);
-                const notification = {
-                    userId: data.followingId,
-                    actorId: data.followerId,
-                    type: "follow",
-                    title: "New Follower",
-                    message: "Someone started following you",
-                    link: `/profile/${data.followerId}`,
-                    read: false,
-                    createdAt: new Date(),
-                };
-                const notifResult = await (0, db_2.createNotification)(notification);
-                // Emit generic notification event
-                if (notifResult) {
-                    io.to(`user:${data.followingId}`).emit("notification", Object.assign(Object.assign({}, notification), { _id: notifResult._id.toString(), id: notifResult._id.toString() }));
-                }
-                io.to(`user:${data.followingId}`).emit("new_follower", { followerId: data.followerId });
-            }
-            catch (error) {
-                console.error("Error handling follow_user:", error);
-            }
-        });
-        // Handle unfollow
-        socket.on("unfollow_user", (data) => {
-            io.to(`user:${data.followingId}`).emit("unfollowed", { followerId: data.followerId });
-        });
-        // Handle new message (Direct Message)
-        socket.on("send_message", async (data) => {
-            console.log(`💬 [Server] Message: ${data.message.senderId} → ${data.receiverId}`);
-            // Use direct socket emission (more reliable than room-based)
-            const [receiverCount, senderCount] = await Promise.all([
-                emitToUser(data.receiverId, "new_message", data.message),
-                emitToUser(data.message.senderId, "new_message", data.message)
-            ]);
-            // Send delivery confirmation to sender if message has an ID
-            if (data.message.id) {
-                await emitToUser(data.message.senderId, "message_delivered", {
-                    messageId: data.message.id,
-                    userId: data.receiverId,
-                    deliveredAt: new Date()
-                });
-            }
-            console.log(`✅ [Server] Message delivered to ${receiverCount} receiver sockets and ${senderCount} sender sockets`);
-        });
-        // Handle message seen/read
-        socket.on("message_read", async (data) => {
-            console.log(`👀 [Server] Message Read: ${data.messageId} by ${data.userId} (Sender: ${data.senderId})`);
-            await emitToUser(data.senderId, "message_read", { messageId: data.messageId, userId: data.userId });
-        });
-        // Handle message reaction
-        socket.on("message_reaction", async (data) => {
-            console.log(`❤️ [Server] Reaction: ${data.messageId} from ${data.userId}`);
-            await Promise.all([emitToUser(data.receiverId, "message_reaction", data), emitToUser(data.userId, "message_reaction", data)]);
-        });
-        // Handle message edit
-        socket.on("message_edited", async (data) => {
-            console.log(`✍️ [Server] Message Edited: ${data.messageId}`);
-            await Promise.all([emitToUser(data.receiverId, "message_edited", data), emitToUser(data.userId, "message_edited", data)]);
-        });
-        // Handle message deletion
-        socket.on("message_deleted", async (data) => {
-            console.log(`🗑️ [Server] Message Deleted: ${data.messageId}`);
-            await Promise.all([emitToUser(data.receiverId, "message_deleted", data), emitToUser(data.userId, "message_deleted", data)]);
-        });
-        socket.on("typing", async (data) => {
-            const senderId = socket.userId;
-            if (senderId) {
-                // Use direct socket emission for typing indicator
-                await emitToUser(data.userId, "typing", { userId: senderId, isTyping: data.isTyping });
-                console.log(`⌨️ Typing indicator: ${senderId} → ${data.userId} (${data.isTyping})`);
-            }
-        });
-        // Handle presence updates (Active/Away)
-        socket.on("update_presence", (data) => {
-            const userId = socket.userId;
-            if (userId) {
-                console.log(`👤 [Server] Presence Update: ${userId} is now ${data.status}`);
-                // Map "away" to "away" and "online" to "online"
-                const status = data.status === "away" ? "away" : "online";
-                // Broadcast to all users
-                io.emit("user_status", {
-                    userId,
-                    status,
-                    lastSeen: data.status === "away" ? new Date().toISOString() : null
-                });
-            }
-        });
-        socket.on("disconnect", async () => {
-            console.log("🔌 Client disconnected:", socket.id);
-            const userId = socket.userId;
+            socket.emit("initial_online_users", context.getOnlineUserIds());
+        },
+        unregisterUserSocket: async (socket) => {
+            var _a, _b;
+            const dbId = socket.userId;
             const oauthId = socket.oauthId;
-            // Clean up from MongoDB _id key
-            if (userId && userSockets.has(userId)) {
-                const sockets = userSockets.get(userId);
-                sockets.delete(socket.id);
-                console.log(`🔌 [Server] Socket ${socket.id} removed from user ${userId}. Remaining: ${sockets.size}`);
-                if (sockets.size === 0) {
-                    userSockets.delete(userId);
-                }
+            removeSocketForUser(userSockets, dbId, socket.id);
+            if (oauthId && oauthId !== dbId) {
+                removeSocketForUser(userSockets, oauthId, socket.id);
             }
-            // Also clean up from OAuth ID key if different
-            if (oauthId && oauthId !== userId && userSockets.has(oauthId)) {
-                const sockets = userSockets.get(oauthId);
-                sockets.delete(socket.id);
-                console.log(`🔌 [Server] Socket ${socket.id} removed from OAuth ${oauthId}. Remaining: ${sockets.size}`);
-                if (sockets.size === 0) {
-                    userSockets.delete(oauthId);
-                }
+            const stillConnected = hasActiveSocket(userSockets, dbId) || (oauthId ? hasActiveSocket(userSockets, oauthId) : false);
+            if (stillConnected)
+                return;
+            const lastSeen = new Date();
+            const user = await (0, user_service_1.markUserOffline)(dbId, lastSeen);
+            const normalizedDbId = ((_b = (_a = user === null || user === void 0 ? void 0 : user._id) === null || _a === void 0 ? void 0 : _a.toString) === null || _b === void 0 ? void 0 : _b.call(_a)) || dbId;
+            const normalizedOauthId = (user === null || user === void 0 ? void 0 : user.id) || oauthId;
+            io.emit("user_status", { userId: normalizedDbId, status: "offline", lastSeen });
+            if (normalizedOauthId && normalizedOauthId !== normalizedDbId) {
+                io.emit("user_status", { userId: normalizedOauthId, status: "offline", lastSeen });
             }
-            // Check if ALL sockets for this user are gone (check both IDs)
-            const userStillConnected = (userId && userSockets.has(userId) && userSockets.get(userId).size > 0) ||
-                (oauthId && userSockets.has(oauthId) && userSockets.get(oauthId).size > 0);
-            if (!userStillConnected && userId) {
-                const lastSeen = new Date();
-                try {
-                    const usersCollection = await (0, mongodb_1.getCollection)(db_1.COLLECTIONS.USERS);
-                    const userIdObj = (0, db_1.toObjectId)(userId);
-                    const user = userIdObj
-                        ? await usersCollection.findOne({ _id: userIdObj })
-                        : await usersCollection.findOne({ id: userId });
-                    if (user) {
-                        const dbId = user._id.toString();
-                        const userOauthId = user.id;
-                        await usersCollection.updateOne({ _id: user._id }, { $set: { isOnline: false, lastSeen: lastSeen } });
-                        console.log(`👋 User ${userId} marked as offline (all tabs closed). DB ID: ${dbId}, OAuth ID: ${userOauthId}`);
-                        // Broadcast for BOTH IDs
-                        io.emit("user_status", { userId: dbId, status: "offline", lastSeen });
-                        if (userOauthId && userOauthId !== dbId) {
-                            io.emit("user_status", { userId: userOauthId, status: "offline", lastSeen });
-                        }
-                    }
-                    else {
-                        // Fallback
-                        await usersCollection.updateOne({ _id: (userIdObj || userId) }, { $set: { isOnline: false, lastSeen: lastSeen } });
-                        io.emit("user_status", { userId, status: "offline", lastSeen });
-                    }
-                }
-                catch (e) {
-                    console.error("❌ Error updating last seen", e);
-                }
+        },
+    };
+    io.use(async (socket, next) => {
+        try {
+            const authUser = await authenticateSocket(socket);
+            if (!authUser) {
+                return next(new Error("Unauthorized"));
             }
+            const authenticatedSocket = socket;
+            authenticatedSocket.userId = authUser.id;
+            authenticatedSocket.oauthId = authUser.oauthId;
+            authenticatedSocket.authUser = authUser;
+            return next();
+        }
+        catch (error) {
+            console.error("[Socket] Authentication failed:", error);
+            return next(new Error("Unauthorized"));
+        }
+    });
+    io.on("connection", async (socket) => {
+        const authenticatedSocket = socket;
+        console.log(`[Socket] Connected: ${socket.id} user=${authenticatedSocket.userId}`);
+        await context.registerUserSocket(authenticatedSocket);
+        (0, user_socket_1.registerUserSocket)(authenticatedSocket, context);
+        (0, message_socket_1.registerMessageSocket)(authenticatedSocket, context);
+        (0, post_socket_1.registerPostSocket)(authenticatedSocket, context);
+        authenticatedSocket.on("error", (error) => {
+            console.error(`[Socket] Error for ${authenticatedSocket.id}:`, error);
         });
     });
+    console.log("[Socket] Socket.IO server initialized");
     return io;
+}
+async function authenticateSocket(socket) {
+    const secret = process.env.NEXTAUTH_SECRET || "dev-secret-change-in-production-min-32-chars-long";
+    const nextAuthToken = await (0, jwt_1.getToken)({
+        req: socket.request,
+        secret,
+    });
+    let payload = nextAuthToken;
+    if (!payload) {
+        const bearerToken = extractBearerToken(socket);
+        if (bearerToken) {
+            payload = jsonwebtoken_1.default.verify(bearerToken, secret);
+        }
+    }
+    if (!payload)
+        return null;
+    const tokenUserId = payload.d || payload.id || payload.sub;
+    const tokenEmail = payload.e || payload.email;
+    let authUser = tokenUserId ? await (0, user_service_1.buildAuthenticatedUser)(tokenUserId) : null;
+    if (!authUser && tokenEmail) {
+        const user = await (0, user_service_1.findUserByEmailAddress)(tokenEmail);
+        if (user === null || user === void 0 ? void 0 : user._id) {
+            authUser = await (0, user_service_1.buildAuthenticatedUser)(user._id.toString());
+        }
+    }
+    return authUser;
+}
+function extractBearerToken(socket) {
+    var _a, _b, _c, _d, _e, _f;
+    const authToken = (_b = (_a = socket.handshake) === null || _a === void 0 ? void 0 : _a.auth) === null || _b === void 0 ? void 0 : _b.token;
+    if (typeof authToken === "string" && authToken.trim())
+        return authToken.trim();
+    const queryToken = (_d = (_c = socket.handshake) === null || _c === void 0 ? void 0 : _c.query) === null || _d === void 0 ? void 0 : _d.token;
+    if (typeof queryToken === "string" && queryToken.trim())
+        return queryToken.trim();
+    const authorization = (_f = (_e = socket.handshake) === null || _e === void 0 ? void 0 : _e.headers) === null || _f === void 0 ? void 0 : _f.authorization;
+    if (typeof authorization === "string" && authorization.startsWith("Bearer ")) {
+        return authorization.slice("Bearer ".length).trim();
+    }
+    return null;
+}
+function addSocketForUser(userSockets, userId, socketId) {
+    const socketIds = userSockets.get(userId) || new Set();
+    socketIds.add(socketId);
+    userSockets.set(userId, socketIds);
+}
+function removeSocketForUser(userSockets, userId, socketId) {
+    const socketIds = userSockets.get(userId);
+    if (!socketIds)
+        return;
+    socketIds.delete(socketId);
+    if (socketIds.size === 0) {
+        userSockets.delete(userId);
+    }
+}
+function hasActiveSocket(userSockets, userId) {
+    var _a;
+    return (((_a = userSockets.get(userId)) === null || _a === void 0 ? void 0 : _a.size) || 0) > 0;
+}
+function getAllowedOrigins() {
+    const allowedOrigins = process.env.ALLOWED_ORIGINS;
+    if (allowedOrigins) {
+        return allowedOrigins.split(",").map((origin) => origin.trim()).filter(Boolean);
+    }
+    if (process.env.NODE_ENV === "production") {
+        return [
+            process.env.NEXTAUTH_URL || "",
+            process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "",
+            process.env.FRONTEND_URL || "",
+        ].filter(Boolean);
+    }
+    return true;
 }

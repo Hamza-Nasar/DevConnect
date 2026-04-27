@@ -70,6 +70,9 @@ export const getSocket = (): CustomSocket | null => {
 
     socket = io(socketUrl, {
       path: "/socket.io",
+      auth: {
+        token: window.localStorage.getItem("devconnect_socket_token") || undefined,
+      },
       transports: ["websocket"], // Force WebSocket only - no polling
       reconnection: true,
       reconnectionAttempts: 5,
@@ -117,6 +120,9 @@ export const getSocket = (): CustomSocket | null => {
         message: error.message,
         timestamp: new Date().toISOString()
       });
+      if (error.message === "Unauthorized") {
+        console.error("[Client] Socket authentication failed. A valid session or socket token is required.");
+      }
     });
 
     socket.on("disconnect", (reason) => {

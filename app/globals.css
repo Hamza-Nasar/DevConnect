@@ -46,14 +46,15 @@
   }
 
   .mobile-chat-stable {
-    /* Premium mobile styles with modern viewport units */
-    /* Dynamic viewport height for keyboard handling */
-    height: 100dvh;
-    /* Fallbacks for older browsers */
-    height: 100svh;
-    height: 100lvh;
-    /* Legacy fallback */
-    height: calc(var(--vh, 1vh) * 100);
+    height: var(--chat-visual-height, 100vh);
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  @supports (height: 100dvh) {
+    .mobile-chat-stable {
+      height: var(--chat-visual-height, 100dvh);
+    }
   }
 
   .chat-messages-container {
@@ -83,121 +84,85 @@
   }
 
   .chat-input-stable {
-    /* Enhanced WhatsApp-style fixed input positioning */
-    position: absolute !important;
-    bottom: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    z-index: 10 !important;
-    /* Prevent input from jumping when keyboard appears */
+    position: relative;
+    z-index: 10;
+    flex-shrink: 0;
     transform: translateZ(0);
     -webkit-transform: translateZ(0);
     will-change: transform;
-    /* Ensure input stays visible with better backdrop */
     background: rgba(17, 24, 39, 0.98) !important;
     backdrop-filter: blur(20px) !important;
     -webkit-backdrop-filter: blur(20px) !important;
-    /* Add subtle border for better definition */
     border-top: 1px solid rgba(55, 65, 81, 0.5);
-    /* Prevent layout shifts */
     contain: layout style;
-    /* Ensure proper touch handling */
     touch-action: manipulation;
   }
 
   /* Enhanced mobile-specific optimizations */
   @media (max-width: 1023px) {
     .mobile-chat-stable {
-      /* WhatsApp-style viewport handling with enhanced stability for mobile only */
-      height: calc(var(--vh, 1vh) * 100);
-      max-height: calc(var(--vh, 1vh) * 100);
+      height: var(--chat-visual-height, 100vh);
+      max-height: var(--chat-visual-height, 100vh);
       overflow: hidden;
       position: fixed !important;
-      top: 0 !important;
+      top: var(--chat-visual-offset-top, 0px) !important;
       left: 0 !important;
       right: 0 !important;
-      bottom: 0 !important;
-      /* Prevent layout shifts and improve performance */
+      bottom: auto !important;
       contain: layout style paint;
       will-change: transform;
       transform: translateZ(0);
       -webkit-transform: translateZ(0);
       backface-visibility: hidden;
       -webkit-backface-visibility: hidden;
-      /* Ensure proper stacking */
-      z-index: 1;
-      /* Ensure full height on mobile with keyboard handling */
-      min-height: calc(var(--vh, 1vh) * 100);
-      /* Better viewport handling */
-      viewport-fit: cover;
-      /* Prevent zoom on input focus */
+      z-index: 40;
+      min-height: var(--chat-visual-height, 100vh);
       touch-action: manipulation;
     }
 
+    @supports (height: 100dvh) {
+      .mobile-chat-stable {
+        height: var(--chat-visual-height, 100dvh);
+        max-height: var(--chat-visual-height, 100dvh);
+        min-height: var(--chat-visual-height, 100dvh);
+      }
+    }
+
     .chat-messages-container {
-      /* Enhanced touch scrolling */
       -webkit-overflow-scrolling: touch;
-      /* Better momentum scrolling control */
       overscroll-behavior: contain;
-      /* Prevent horizontal scrolling issues */
       overflow-x: hidden;
-      /* Better performance */
       -webkit-transform: translate3d(0, 0, 0);
       transform: translate3d(0, 0, 0);
     }
 
     .chat-input-stable {
-      /* Premium mobile keyboard positioning with safe areas */
       padding-bottom: max(env(safe-area-inset-bottom), 0.5rem) !important;
       padding-left: max(env(safe-area-inset-left), 0.5rem) !important;
       padding-right: max(env(safe-area-inset-right), 0.5rem) !important;
-      /* Ensure visibility when keyboard is present */
-      position: fixed !important;
-      /* Better input handling */
+
       input, textarea {
-        /* Prevent zoom on iOS */
         font-size: 16px !important;
-        /* Better touch targets */
         min-height: 44px !important;
-        /* Enhanced mobile experience */
         -webkit-appearance: none;
         border-radius: 0.5rem;
-        /* Better text selection */
         -webkit-user-select: text;
         user-select: text;
       }
 
-      /* Premium input styling */
       input:focus, textarea:focus {
-        /* Enhanced focus state */
         box-shadow: 0 0 0 2px rgba(147, 51, 234, 0.3);
         border-color: rgba(147, 51, 234, 0.5);
       }
     }
 
-    /* Keyboard-specific adjustments */
-    .keyboard-visible .chat-messages-container {
-      /* Reduce height when keyboard is visible */
-      max-height: calc(100vh - 120px - var(--keyboard-height, 0px)) !important;
-    }
-
-    .keyboard-visible .chat-input-stable {
-      /* Adjust input position when keyboard is visible */
-      bottom: var(--keyboard-height, 0px) !important;
-    }
-
-    /* Prevent layout shifts during transitions */
     .mobile-chat-stable * {
-      /* Ensure smooth transitions */
       transition-property: transform, opacity, height, max-height;
       transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
     }
 
-    /* Optimize input handling */
     .chat-input-stable input {
-      /* Prevent zoom on iOS */
       font-size: 16px;
-      /* Better touch targets */
       min-height: 44px;
     }
   }
@@ -211,15 +176,16 @@
 
   /* Chat window card styling for PC screens */
   .chat-window-card {
-    /* Default PC styling */
     position: relative;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
     height: 100%;
-    max-height: none; /* Allow natural height on PC */
+    max-height: none;
   }
 
   /* Chat messages container for PC screens */
   .chat-messages-pc {
-    /* Default PC styling - natural height */
     height: auto;
     max-height: none;
   }
@@ -261,59 +227,34 @@
     }
   }
 
-  /* Large screen chat container optimizations - Premium Layout */
   .chat-window-card,
   .chat-list-card {
-    /* Comfortable height for premium chat experience */
-    min-height: 450px;
-    max-height: 550px; /* Prevent excessive height and scrolling */
-    /* Premium rounded corners */
+    min-width: 0;
+    min-height: 0;
+    max-width: none;
+    max-height: none;
     border-radius: 12px;
   }
 
-  /* Grid layout (no chat selected) */
   .chat-list-card {
-    /* Chat list should be narrower in grid */
-    max-width: 320px;
-  }
-
-  .chat-window-card {
-    /* Chat window should be wider for better message visibility in grid */
-    min-width: 500px;
-  }
-
-  /* Flex layout (chat selected) - Full width usage */
-  .chat-list-card.flex {
-    width: 320px; /* Fixed width for chat list when chat is open */
-    max-width: 320px;
-    flex-shrink: 0;
-  }
-
-  .chat-window-card.flex {
-    flex: 1; /* Take remaining space */
-    min-width: 0; /* Allow shrinking */
-    max-width: none; /* No max width restriction */
+    width: 100%;
   }
 
   @media (min-width: 1024px) {
     .chat-window-card,
     .chat-list-card {
-      /* Large screens get optimal height for productivity */
       min-height: 500px;
       max-height: 600px;
-      /* Enhanced premium styling */
       box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
     }
 
-    /* Sidebar layout - chat list acts as fixed sidebar */
     .chat-list-card {
-      /* Responsive sidebar width for better fit */
       width: 100%;
       max-width: 320px;
+      flex-shrink: 0;
     }
 
     .chat-window-card {
-      /* Main content area takes remaining space */
       flex: 1;
       min-width: 0;
     }
@@ -322,22 +263,17 @@
   @media (min-width: 1280px) {
     .chat-window-card,
     .chat-list-card {
-      /* Extra large screens get premium height */
       min-height: 550px;
       max-height: 650px;
-      /* Maximum premium effect */
       box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
     }
 
-    /* Sidebar layout for extra large screens */
     .chat-list-card {
-      /* Optimized sidebar width for extra large screens */
       width: 100%;
       max-width: 320px;
     }
 
     .chat-window-card {
-      /* Main content area takes remaining space */
       flex: 1;
       min-width: 0;
     }
@@ -346,39 +282,40 @@
   /* Mobile overrides */
   @media (max-width: 1023px) {
     #chat-container {
-      /* Ensure full height on mobile for proper scrolling */
-      height: 100vh;
-      max-height: 100vh;
+      height: var(--chat-visual-height, 100vh);
+      max-height: var(--chat-visual-height, 100vh);
+    }
+
+    @supports (height: 100dvh) {
+      #chat-container {
+        height: var(--chat-visual-height, 100dvh);
+        max-height: var(--chat-visual-height, 100dvh);
+      }
     }
 
     .chat-window-card {
-      /* Mobile specific styling - allow natural height */
       position: relative;
       height: 100%;
       max-height: 100%;
+      min-width: 0;
+      border-radius: 0;
       will-change: transform;
     }
 
     .chat-messages-container {
-      /* Mobile specific styling - natural flex behavior */
       flex: 1;
       min-height: 0;
-      /* Allow natural scrolling without fixed heights */
       height: auto;
       max-height: none;
-      /* Ensure proper scrolling */
       overflow-y: auto;
       overflow-x: hidden; /* Prevent horizontal scrolling */
       -webkit-overflow-scrolling: touch;
-      /* Better mobile performance */
       transform: translateZ(0);
       -webkit-transform: translateZ(0);
-      /* Prevent content from being hidden behind keyboard */
       padding-bottom: 1rem;
     }
 
     .chat-input-stable {
-      /* Mobile specific positioning - natural flow */
       position: relative;
       flex-shrink: 0;
     }
