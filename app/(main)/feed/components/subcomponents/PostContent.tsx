@@ -161,7 +161,7 @@ export default function PostContent({
                         <StableImage
                             key={i}
                             src={img}
-                            alt=""
+                            alt={`Post image ${i + 1}`}
                             className="w-full"
                             aspectRatio="16/9"
                         />
@@ -172,7 +172,7 @@ export default function PostContent({
             {/* Link Preview */}
             {post.linkPreview && (
                 <a href={post.linkPreview.url} target="_blank" rel="noopener" className="block border border-gray-700 rounded-xl overflow-hidden bg-gray-800/30 hover:bg-gray-800/50 transition group">
-                    {post.linkPreview.image && <img src={post.linkPreview.image} alt="" className="w-full h-48 object-cover border-b border-gray-700" />}
+                    {post.linkPreview.image && <img src={post.linkPreview.image} alt={post.linkPreview.title || "Link preview image"} className="w-full h-48 object-cover border-b border-gray-700" />}
                     <div className="p-4">
                         <h4 className="font-semibold text-white mb-1 group-hover:text-purple-400 transition">{post.linkPreview.title}</h4>
                         <p className="text-sm text-gray-400 line-clamp-2">{post.linkPreview.description}</p>
