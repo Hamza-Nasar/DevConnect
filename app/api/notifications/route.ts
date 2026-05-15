@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getCollection } from "@/lib/mongodb";
+import { toObjectId } from "@/lib/db";
 
 export async function GET(req: NextRequest) {
   try {
@@ -66,8 +67,12 @@ export async function PATCH(req: NextRequest) {
         { $set: { read: true } }
       );
     } else if (notificationId) {
+      const notificationObjectId = toObjectId(notificationId);
+      if (!notificationObjectId) {
+        return NextResponse.json({ error: "Invalid notification id" }, { status: 400 });
+      }
       await notificationsCollection.updateOne(
-        { _id: notificationId, userId: session.user.id },
+        { _id: notificationObjectId, userId: session.user.id },
         { $set: { read: true } }
       );
     }

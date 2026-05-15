@@ -13,6 +13,7 @@ export interface SocketContext {
   userIdMapping: Map<string, string>;
   emitToUser: (userId: string, event: string, data: unknown) => Promise<number>;
   getOnlineUserIds: () => string[];
+  updateUserPresence: (socket: AuthenticatedSocket, status: "online" | "away" | "busy") => void;
   registerUserSocket: (socket: AuthenticatedSocket) => Promise<void>;
   unregisterUserSocket: (socket: AuthenticatedSocket) => Promise<void>;
 }

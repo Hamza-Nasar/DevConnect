@@ -2,6 +2,8 @@ import { getServerSession } from "next-auth/next";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { getSocketInstance } from "@/lib/socket-server";
+import { getCollection } from "@/lib/mongodb";
+import { COLLECTIONS } from "@/lib/db";
 import {
   CreatePostInput,
   createPostForUserEmail,
@@ -40,6 +42,36 @@ export async function POST(req: Request) {
 
       io.to(`user:${userId}`).emit("post_created", fullPostData);
       console.log("Real-time post broadcasted:", post?._id?.toString?.());
+
+      // First-reply routing: push need-help posts to relevant stack users.
+      if (response.postType === "need_help") {
+        const stackTags = response.helpContext?.stackTags || [];
+        if (stackTags.length > 0) {
+          const usersCollection = await getCollection(COLLECTIONS.USERS);
+          const experts = await usersCollection
+            .find({
+              _id: { $ne: user._id },
+              $or: [
+                { skills: { $in: stackTags } },
+                { "developerProfile.stacks": { $in: stackTags } },
+                { interests: { $in: stackTags } },
+              ],
+            })
+            .limit(50)
+            .toArray();
+
+          for (const expert of experts) {
+            io.to(`user:${expert._id.toString()}`).emit("need_help_posted", {
+              postId: response.id,
+              title: response.title,
+              urgency: response.helpContext?.urgency || "medium",
+              stackTags,
+              fromUserId: userId,
+              createdAt: response.createdAt,
+            });
+          }
+        }
+      }
     }
 
     return NextResponse.json(response, { status: 201 });
@@ -59,8 +91,12 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
     const limit = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") || "20", 10)));
+    const filter = searchParams.get("filter") || "All";
 
-    const posts = await getFeedPosts(userId, page, limit);
+    const posts = await Promise.race([
+      getFeedPosts(userId, page, limit, filter),
+      new Promise<any[]>((resolve) => setTimeout(() => resolve([]), 8000)),
+    ]);
     return NextResponse.json({ posts }, { status: 200 });
   } catch (error) {
     console.error("Error fetching posts:", error);

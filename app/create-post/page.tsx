@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Image as ImageIcon,
   Video,
@@ -24,11 +24,47 @@ import getSocket from "@/lib/socket";
 export default function CreatePostPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [content, setContent] = useState("");
   const [title, setTitle] = useState("");
   const [images, setImages] = useState<string[]>([]);
+  const [postMode, setPostMode] = useState<"regular" | "need_help">("regular");
+  const [helpUrgency, setHelpUrgency] = useState<"low" | "medium" | "high">("medium");
+  const [helpStack, setHelpStack] = useState("");
   const [isPosting, setIsPosting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Keep hooks order stable across renders.
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/login");
+    }
+  }, [status, router]);
+
+  useEffect(() => {
+    if (searchParams.get("type") === "need_help") {
+      setPostMode("need_help");
+    }
+  }, [searchParams]);
+
+  // Ensure socket connection only after authenticated session is ready.
+  useEffect(() => {
+    if (status !== "authenticated" || !session?.user?.id) return;
+
+    const socket = getSocket();
+    if (!socket) return;
+
+    const joinRoom = () => {
+      socket.emit("join", session.user?.id || "");
+    };
+
+    joinRoom();
+    socket.on("connect", joinRoom);
+
+    return () => {
+      socket.off("connect", joinRoom);
+    };
+  }, [status, session?.user?.id]);
 
   if (status === "loading") {
     return (
@@ -39,20 +75,8 @@ export default function CreatePostPage() {
   }
 
   if (!session) {
-    router.push("/login");
     return null;
   }
-
-  // Ensure socket connection
-  useEffect(() => {
-    const socket = getSocket();
-    if (socket && session?.user?.id) {
-      socket.emit("join", session.user.id);
-      socket.on("connect", () => {
-        socket.emit("join", session.user?.id || "");
-      });
-    }
-  }, [session?.user?.id]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target?.files;
@@ -110,7 +134,18 @@ export default function CreatePostPage() {
           title,
           content,
           images,
-          type: "regular",
+          postType: postMode,
+          helpContext:
+            postMode === "need_help"
+              ? {
+                  urgency: helpUrgency,
+                  stackTags: helpStack
+                    .split(",")
+                    .map((item) => item.trim().toLowerCase())
+                    .filter(Boolean),
+                  status: "open",
+                }
+              : undefined,
         }),
       });
 
@@ -129,6 +164,7 @@ export default function CreatePostPage() {
           userId: session.user.id,
         });
       }
+      localStorage.setItem("activationFirstActionDone", "1");
 
       toast.success("Post created successfully! 🎉");
       
@@ -136,6 +172,9 @@ export default function CreatePostPage() {
       setContent("");
       setTitle("");
       setImages([]);
+      setPostMode("regular");
+      setHelpUrgency("medium");
+      setHelpStack("");
 
       // Redirect to feed after a short delay
       setTimeout(() => {
@@ -199,6 +238,25 @@ export default function CreatePostPage() {
                     />
                     <div className="flex-1 space-y-3 sm:space-y-4 min-w-0">
                       <div className="space-y-2">
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            variant={postMode === "regular" ? "primary" : "ghost"}
+                            size="sm"
+                            onClick={() => setPostMode("regular")}
+                          >
+                            Regular Post
+                          </Button>
+                          <Button
+                            type="button"
+                            variant={postMode === "need_help" ? "primary" : "ghost"}
+                            size="sm"
+                            onClick={() => setPostMode("need_help")}
+                          >
+                            Need Help
+                          </Button>
+                        </div>
+
                         <input
                           type="text"
                           placeholder="Add a title (optional)"
@@ -212,6 +270,31 @@ export default function CreatePostPage() {
                           onChange={(e) => setContent(e.target.value)}
                           className="min-h-[100px] sm:min-h-[120px] resize-none bg-gray-800/50 border-gray-700 text-white placeholder-gray-500 text-sm sm:text-base focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
                         />
+
+                        {postMode === "need_help" && (
+                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <div>
+                              <label className="mb-1 block text-xs font-medium text-gray-300">Urgency</label>
+                              <select
+                                value={helpUrgency}
+                                onChange={(e) => setHelpUrgency(e.target.value as "low" | "medium" | "high")}
+                                className="w-full rounded-lg border border-gray-700 bg-gray-800/60 px-3 py-2 text-sm text-white"
+                              >
+                                <option value="low">Low</option>
+                                <option value="medium">Medium</option>
+                                <option value="high">High</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-xs font-medium text-gray-300">Stack Tags</label>
+                              <Input
+                                value={helpStack}
+                                onChange={(e) => setHelpStack(e.target.value)}
+                                placeholder="react,nextjs,mongodb"
+                              />
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* Images/Video Preview */}

@@ -11,6 +11,7 @@ interface PostMetrics {
     createdAt: Date;
     userId: string;
     hashtags: string[];
+    stackTags?: string[];
     hasCode?: boolean;
     content: string;
 }
@@ -19,6 +20,8 @@ interface UserPreferences {
     followedUsers: string[];
     likedHashtags: string[];
     interactedUsers: string[];
+    preferredStacks?: string[];
+    userGoal?: string | null;
     mood?: string;
 }
 
@@ -67,6 +70,14 @@ export function calculatePostScore(
 
     // Poll bonus (active polls are engaging)
     if (post.type === "poll") qualityScore += 25;
+    if (post.type === "need_help") qualityScore += 15;
+
+    // Stack affinity for help posts / technical content
+    if (userPrefs.preferredStacks?.length && post.stackTags?.length) {
+      const preferred = userPrefs.preferredStacks.map((s) => s.toLowerCase());
+      const matchedStacks = post.stackTags.filter((tag) => preferred.includes(tag.toLowerCase())).length;
+      qualityScore += Math.min(matchedStacks * 20, 60);
+    }
 
     // Sentiment alignment (bonus for positive/inspiring content)
     const sentiment = analyzeSentiment(post.content);
@@ -79,6 +90,11 @@ export function calculatePostScore(
     // Mood alignment
     if (userPrefs.mood && post.content.toLowerCase().includes(userPrefs.mood.toLowerCase())) {
         qualityScore += 40;
+    }
+
+    // Goal alignment for career-oriented users
+    if (userPrefs.userGoal === "hiring" && post.content.toLowerCase().includes("hiring")) {
+      qualityScore += 20;
     }
 
     score += Math.min(qualityScore, 100) * 0.2;

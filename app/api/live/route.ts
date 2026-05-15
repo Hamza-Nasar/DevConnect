@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getCollection } from "@/lib/mongodb";
+import { toObjectId } from "@/lib/db";
 
 export async function GET(req: NextRequest) {
   try {
@@ -19,12 +20,19 @@ export async function GET(req: NextRequest) {
       .limit(20)
       .toArray();
 
-    // Populate streamer data
+    // Populate streamer data and expose a stable RTC room id.
     for (const stream of streams) {
       if (stream.streamerId) {
-        const user = await usersCollection.findOne({ _id: stream.streamerId });
+        const streamerObjId = toObjectId(stream.streamerId);
+        const user = await usersCollection.findOne({
+          $or: [
+            streamerObjId ? { _id: streamerObjId } : ({} as any),
+            { id: stream.streamerId },
+          ],
+        });
         stream.streamer = user || { id: stream.streamerId };
       }
+      stream.rtcRoomId = stream.streamerId || stream._id?.toString?.();
     }
 
     return NextResponse.json({ streams });

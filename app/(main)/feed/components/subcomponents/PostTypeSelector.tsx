@@ -1,24 +1,25 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { FileText, BarChart3 as PollIcon, Zap, Film } from "lucide-react";
+import { FileText, BarChart3 as PollIcon, Zap, Film, LifeBuoy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface PostTypeSelectorProps {
-  postType: "text" | "poll" | "story" | "reel";
-  setPostType: (type: "text" | "poll" | "story" | "reel") => void;
+  postType: "text" | "poll" | "story" | "reel" | "need_help";
+  setPostType: (type: "text" | "poll" | "story" | "reel" | "need_help") => void;
 }
 
 export default function PostTypeSelector({ postType, setPostType }: PostTypeSelectorProps) {
   const types = [
     { id: "text", label: "Text", icon: FileText },
+    { id: "need_help", label: "Need Help", icon: LifeBuoy },
     { id: "poll", label: "Poll", icon: PollIcon },
     { id: "story", label: "Story", icon: Zap },
     { id: "reel", label: "Reel", icon: Film },
   ] as const;
 
   return (
-    <div className="grid grid-cols-4 gap-1.5 sm:gap-2 sm:flex sm:flex-wrap sm:p-2 sm:bg-gray-800/20 sm:rounded-xl sm:border sm:border-gray-700/30">
+    <div className="grid grid-cols-3 gap-1.5 sm:gap-2 sm:flex sm:flex-wrap sm:p-2 sm:bg-gray-800/20 sm:rounded-xl sm:border sm:border-gray-700/30">
       {types.map((type) => {
         const Icon = type.icon;
         const isActive = postType === type.id;

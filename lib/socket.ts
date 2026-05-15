@@ -9,6 +9,14 @@ let socket: CustomSocket | null = null;
 export const getSocket = (): CustomSocket | null => {
   // Strict check for client-side environment
   if (typeof window === "undefined" || !window?.location) return null;
+  const hasSessionCookie =
+    typeof document !== "undefined" &&
+    (document.cookie.includes("next-auth.session-token=") ||
+      document.cookie.includes("__Secure-next-auth.session-token="));
+  const authToken = window.localStorage.getItem("devconnect_socket_token");
+  if (!hasSessionCookie && !authToken) {
+    return null;
+  }
 
   if (!socket) {
     const origin = window.location.origin.replace(/\/$/, "");
@@ -71,9 +79,9 @@ export const getSocket = (): CustomSocket | null => {
     socket = io(socketUrl, {
       path: "/socket.io",
       auth: {
-        token: window.localStorage.getItem("devconnect_socket_token") || undefined,
+        token: authToken || undefined,
       },
-      transports: ["websocket"], // Force WebSocket only - no polling
+      transports: ["websocket", "polling"],
       reconnection: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
@@ -81,7 +89,7 @@ export const getSocket = (): CustomSocket | null => {
       timeout: 10000,
       withCredentials: true, // Enable credentials for production
       autoConnect: true,
-      forceNew: true,
+      forceNew: false,
     }) as CustomSocket;
 
   // Diagnostics for debugging

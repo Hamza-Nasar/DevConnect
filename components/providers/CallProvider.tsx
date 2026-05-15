@@ -221,7 +221,7 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
 
             const peer = new SimplePeer({
                 initiator: true,
-                trickle: false,
+                trickle: true,
                 stream: currentStream,
             });
 
@@ -238,6 +238,14 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
 
             peer.on("stream", (remoteStream: MediaStream) => {
                 setOtherUserStream(remoteStream);
+            });
+
+            peer.on("error", (error: any) => {
+                console.error("Call peer error (caller):", error);
+            });
+
+            peer.on("close", () => {
+                resetCall();
             });
 
             connectionRef.current = peer;
@@ -260,7 +268,7 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
 
             const peer = new SimplePeer({
                 initiator: false,
-                trickle: false,
+                trickle: true,
                 stream: currentStream,
             });
 
@@ -270,6 +278,14 @@ export const CallProvider = ({ children }: { children: React.ReactNode }) => {
 
             peer.on("stream", (remoteStream: MediaStream) => {
                 setOtherUserStream(remoteStream);
+            });
+
+            peer.on("error", (error: any) => {
+                console.error("Call peer error (callee):", error);
+            });
+
+            peer.on("close", () => {
+                resetCall();
             });
 
             peer.signal(incomingCall.signal);

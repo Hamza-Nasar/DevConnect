@@ -26,7 +26,13 @@ export interface CreatePostInput {
     description?: string;
     image?: string;
   };
-  postType?: "tip" | "bug" | "library" | "announcement" | "regular";
+  postType?: "tip" | "bug" | "library" | "announcement" | "regular" | "need_help" | "poll" | "story" | "reel";
+  type?: "text" | "poll" | "story" | "reel" | "need_help";
+  helpContext?: {
+    urgency?: "low" | "medium" | "high";
+    stackTags?: string[];
+    status?: "open" | "investigating" | "solved";
+  };
   codeSnippet?: {
     code: string;
     language: string;
@@ -63,7 +69,18 @@ export async function createPostForUserEmail(email: string, input: CreatePostInp
     linkPreview: input.linkPreview || null,
     isPublic: input.isPublic !== false,
     groupId: input.groupId || null,
-    postType: input.postType || "regular",
+    postType:
+      input.postType ||
+      (input.type === "text" ? "regular" : input.type) ||
+      "regular",
+    helpContext:
+      input.helpContext && (input.postType === "need_help" || input.type === "need_help")
+        ? {
+            urgency: input.helpContext.urgency || "medium",
+            stackTags: input.helpContext.stackTags || [],
+            status: input.helpContext.status || "open",
+          }
+        : null,
     codeSnippet: input.codeSnippet || null,
     language: input.language || null,
     framework: input.framework || null,
@@ -80,38 +97,45 @@ export async function createPostForUserEmail(email: string, input: CreatePostInp
   };
 }
 
-export async function getFeedPosts(userId: string | undefined, page: number, limit: number) {
+export async function getFeedPosts(
+  userId: string | undefined,
+  page: number,
+  limit: number,
+  filter: string = "All"
+) {
   const skip = (page - 1) * limit;
-  const posts = (await findPosts(limit, skip)) as WithId<Document>[];
+  const posts = (await findPosts(limit, skip, filter)) as WithId<Document>[];
 
   if (!posts?.length) return [];
 
-  const commentsCollection = await getCollection(COLLECTIONS.COMMENTS);
   const likesCollection = await getCollection(COLLECTIONS.LIKES);
   const usersCollection = await getCollection(COLLECTIONS.USERS);
+  const postIds = posts.map((post) => toStringId(post._id)).filter(Boolean) as string[];
+  const userIds = Array.from(new Set(posts.map((post) => post.userId).filter(Boolean)));
+
+  const userObjectIds = userIds
+    .map((id) => toObjectId(id))
+    .filter((id): id is NonNullable<typeof id> => id !== null);
+
+  const [users, likedDocs] = await Promise.all([
+    usersCollection.find({ _id: { $in: userObjectIds } }).toArray(),
+    userId
+      ? likesCollection.find({ userId: userId.toString(), postId: { $in: postIds } }).toArray()
+      : Promise.resolve([] as any[]),
+  ]);
+
+  const userMap = new Map(users.map((user) => [toStringId(user._id), user]));
+  const likedSet = new Set(likedDocs.map((doc: any) => doc.postId));
 
   const formattedPosts = await Promise.all(
     posts.map(async (post) => {
-      const postId = toStringId(post._id);
-      const postUserId = post.userId;
-      const userIdObj = toObjectId(postUserId);
-      const user = userIdObj ? await usersCollection.findOne({ _id: userIdObj }) : null;
-
-      const [comments, liked, likesCount] = await Promise.all([
-        commentsCollection.find({ postId }).toArray(),
-        userId
-          ? likesCollection.findOne({
-              userId: userId.toString(),
-              postId,
-            })
-          : null,
-        likesCollection.countDocuments({ postId }),
-      ]);
+      const postId = toStringId(post._id) as string;
+      const user = userMap.get(post.userId) || null;
 
       return formatPost(post, user, {
-        likedByUser: !!liked,
-        commentsCount: post.commentsCount || comments.length,
-        likesCount: post.likesCount || likesCount,
+        likedByUser: likedSet.has(postId),
+        commentsCount: post.commentsCount || 0,
+        likesCount: post.likesCount || 0,
       });
     })
   );
@@ -129,7 +153,7 @@ export async function getFeedPosts(userId: string | undefined, page: number, lim
         .filter((post) => post.id && post.user.id)
         .map((post) => ({
           id: post.id as string,
-          type: "regular",
+          type: (post.postType as string) || "regular",
           likesCount: post.likesCount || 0,
           commentsCount: post.commentsCount || 0,
           sharesCount: post.sharesCount || 0,
@@ -137,14 +161,17 @@ export async function getFeedPosts(userId: string | undefined, page: number, lim
           createdAt: new Date(post.createdAt),
           userId: post.user.id as string,
           hashtags: post.hashtags || [],
+          stackTags: post.helpContext?.stackTags || [],
           hasCode: !!post.codeSnippet,
           content: post.content || "",
         })),
       {
         followedUsers,
-        likedHashtags: userDoc?.interests || [],
+        likedHashtags: [...(userDoc?.interests || []), ...(userDoc?.skills || [])],
         interactedUsers: [],
         mood: userDoc?.currentMood || null,
+        preferredStacks: userDoc?.developerProfile?.stacks || [],
+        userGoal: userDoc?.developerProfile?.goal || null,
       }
     );
 
@@ -196,6 +223,8 @@ function formatPost(post: any, user: any, overrides: Record<string, unknown> = {
     sharedByUser: false,
     isPublic: post?.isPublic !== false,
     codeSnippet: post?.codeSnippet || null,
+    postType: post?.postType || "regular",
+    helpContext: post?.helpContext || null,
     ...overrides,
   };
 }

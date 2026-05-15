@@ -29,7 +29,9 @@ export default function CreatePost() {
   const [images, setImages] = useState<string[]>([]);
   const [hashtags, setHashtags] = useState<string[]>([]);
   const [isPosting, setIsPosting] = useState(false);
-  const [postType, setPostType] = useState<"text" | "poll" | "story" | "reel">("text");
+  const [postType, setPostType] = useState<"text" | "poll" | "story" | "reel" | "need_help">("text");
+  const [helpUrgency, setHelpUrgency] = useState<"low" | "medium" | "high">("medium");
+  const [helpStack, setHelpStack] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showHashtagInput, setShowHashtagInput] = useState(false);
   const [hashtagInput, setHashtagInput] = useState("");
@@ -104,12 +106,23 @@ export default function CreatePost() {
         hashtags,
         location: location || undefined,
         linkPreview: linkPreview || undefined,
-        type: postType,
+        postType: postType === "text" ? "regular" : postType,
       };
 
       if (postType === "poll") {
         postData.pollOptions = pollOptions.filter(o => o.trim());
         postData.pollDuration = pollDuration;
+      }
+
+      if (postType === "need_help") {
+        postData.helpContext = {
+          urgency: helpUrgency,
+          stackTags: helpStack
+            .split(",")
+            .map((tag) => tag.trim().toLowerCase())
+            .filter(Boolean),
+          status: "open",
+        };
       }
 
       const res = await fetch("/api/posts", {
@@ -122,7 +135,7 @@ export default function CreatePost() {
 
       const data = await res.json();
       getSocket()?.emit("new_post", { postId: data.id, userId: session.user.id });
-
+      localStorage.setItem("activationFirstActionDone", "1");
       toast.success("Post created successfully! 🎉");
       resetForm();
     } catch (error) {
@@ -140,6 +153,8 @@ export default function CreatePost() {
     setLocation("");
     setPollOptions(["", ""]);
     setPostType("text");
+    setHelpUrgency("medium");
+    setHelpStack("");
     setLinkUrl("");
     setLinkPreview(null);
     setShowLocationPicker(false);
@@ -171,7 +186,7 @@ export default function CreatePost() {
                     className="w-full px-4 py-2 text-sm sm:text-base bg-gray-800/50 border border-gray-700 rounded-lg sm:rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
                   />
                   <Textarea
-                    placeholder="What's on your mind?"
+                    placeholder={postType === "need_help" ? "What issue are you facing? Include error, expected behavior, and what you already tried." : "What's on your mind?"}
                     value={content}
                     onChange={(e) => handleContentChange(e.target.value)}
                     className="min-h-[100px] sm:min-h-[120px] resize-none bg-gray-800/50 border-gray-700"
@@ -187,6 +202,33 @@ export default function CreatePost() {
                     pollDuration={pollDuration}
                     setPollDuration={setPollDuration}
                   />
+                )}
+
+                {postType === "need_help" && (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-gray-300">Urgency</label>
+                      <select
+                        value={helpUrgency}
+                        onChange={(e) => setHelpUrgency(e.target.value as "low" | "medium" | "high")}
+                        className="w-full rounded-lg border border-gray-700 bg-gray-800/60 px-3 py-2 text-sm text-white"
+                      >
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-gray-300">Stack Tags</label>
+                      <input
+                        type="text"
+                        value={helpStack}
+                        onChange={(e) => setHelpStack(e.target.value)}
+                        placeholder="react,nextjs,mongodb"
+                        className="w-full rounded-lg border border-gray-700 bg-gray-800/60 px-3 py-2 text-sm text-white placeholder-gray-500"
+                      />
+                    </div>
+                  </div>
                 )}
 
                 {location && (

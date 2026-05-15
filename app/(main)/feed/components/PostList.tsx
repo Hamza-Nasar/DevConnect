@@ -47,7 +47,6 @@ export default function PostList({ onDelete, filter = "All" }: PostListProps) {
   const [page, setPage] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const isLoadingRef = useRef(false);
-  const hasMountedRef = useRef(false);
 
   const fetchPosts = useCallback(async (pageNum: number = 1, append: boolean = false) => {
     if (isLoadingRef.current) return;

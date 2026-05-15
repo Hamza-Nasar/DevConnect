@@ -26,6 +26,7 @@ export default function WebRTCLive({ streamId, isHost = false, onEnd }: WebRTCLi
   const [likes, setLikes] = useState(0);
   const [comments, setComments] = useState<string[]>([]);
   const [newComment, setNewComment] = useState("");
+  const [activeRoomId, setActiveRoomId] = useState<string | null>(streamId || null);
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -47,10 +48,11 @@ export default function WebRTCLive({ streamId, isHost = false, onEnd }: WebRTCLi
     const socket = socketRef.current;
     if (!socket) return;
 
-    if (isHost && streamId) {
-      socket.emit("join_stream", { streamId, isHost: true });
-    } else if (streamId) {
-      socket.emit("join_stream", { streamId, isHost: false });
+    const roomId = activeRoomId || streamId;
+    if (isHost && roomId) {
+      socket.emit("join_stream", { streamId: roomId, isHost: true });
+    } else if (roomId) {
+      socket.emit("join_stream", { streamId: roomId, isHost: false });
     }
 
     socket.on("viewer_count", (count: number) => {
@@ -90,14 +92,37 @@ export default function WebRTCLive({ streamId, isHost = false, onEnd }: WebRTCLi
       socket.off("offer");
       socket.off("answer");
       socket.off("ice-candidate");
-      if (streamId) {
-        socket.emit("leave_stream", { streamId });
+      if (roomId) {
+        socket.emit("leave_stream", { streamId: roomId });
       }
     };
-  }, [isHost, streamId]);
+  }, [isHost, streamId, activeRoomId]);
 
   const startLive = async () => {
     try {
+      let roomId = streamId || activeRoomId || session?.user?.id || null;
+      if (isHost && session?.user?.id) {
+        try {
+          const res = await fetch("/api/live", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              title: `${session.user.name || "Developer"} Live`,
+              description: "Live coding session",
+              category: "Coding",
+            }),
+          });
+          if (res.ok) {
+            const payload = await res.json();
+            roomId = payload?.stream?.streamerId || roomId;
+          }
+        } catch {
+          // Best-effort stream record creation; RTC can continue without DB record.
+        }
+      }
+      if (!roomId) throw new Error("No stream room id available");
+      setActiveRoomId(roomId);
+
       // Get user media (camera + microphone)
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
@@ -126,7 +151,7 @@ export default function WebRTCLive({ streamId, isHost = false, onEnd }: WebRTCLi
       peerConnectionRef.current.onicecandidate = (event) => {
         if (event.candidate && socketRef.current) {
           socketRef.current.emit("ice-candidate", {
-            streamId,
+            streamId: roomId,
             candidate: event.candidate,
           });
         }
@@ -145,7 +170,7 @@ export default function WebRTCLive({ streamId, isHost = false, onEnd }: WebRTCLi
         await peerConnectionRef.current.setLocalDescription(offer);
 
         socketRef.current?.emit("offer", {
-          streamId,
+          streamId: roomId,
           offer: peerConnectionRef.current.localDescription,
         });
       }
@@ -195,7 +220,7 @@ export default function WebRTCLive({ streamId, isHost = false, onEnd }: WebRTCLi
       peerConnectionRef.current.onicecandidate = (event) => {
         if (event.candidate && socketRef.current) {
           socketRef.current.emit("ice-candidate", {
-            streamId,
+            streamId: activeRoomId || streamId,
             candidate: event.candidate,
           });
         }
@@ -209,7 +234,7 @@ export default function WebRTCLive({ streamId, isHost = false, onEnd }: WebRTCLi
     await peerConnectionRef.current.setLocalDescription(answer);
 
     socketRef.current?.emit("answer", {
-      streamId,
+      streamId: activeRoomId || streamId,
       answer: peerConnectionRef.current.localDescription,
     });
   };
@@ -241,17 +266,17 @@ export default function WebRTCLive({ streamId, isHost = false, onEnd }: WebRTCLi
   };
 
   const handleLike = () => {
-    if (socketRef.current && streamId) {
-      socketRef.current.emit("stream_like", { streamId });
+    if (socketRef.current && (activeRoomId || streamId)) {
+      socketRef.current.emit("stream_like", { streamId: activeRoomId || streamId });
       setLikes((prev) => prev + 1);
     }
   };
 
   const handleComment = (e: React.FormEvent) => {
     e.preventDefault();
-    if (newComment.trim() && socketRef.current && streamId) {
+    if (newComment.trim() && socketRef.current && (activeRoomId || streamId)) {
       socketRef.current.emit("stream_comment", {
-        streamId,
+        streamId: activeRoomId || streamId,
         user: session?.user?.name || "Anonymous",
         message: newComment,
       });

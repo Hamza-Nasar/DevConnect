@@ -1,8 +1,10 @@
 import { Server as HTTPServer } from "http";
 import { Server as SocketIOServer } from "socket.io";
 import jwt from "jsonwebtoken";
-import { getToken } from "next-auth/jwt";
+import { decode, getToken } from "next-auth/jwt";
 import { setSocketInstance } from "../lib/socket-server";
+import { getCollection } from "../lib/mongodb";
+import { COLLECTIONS } from "../lib/db";
 import { ensureDatabaseIndexes } from "../services/database-index.service";
 import {
   buildAuthenticatedUser,
@@ -56,9 +58,48 @@ export function initializeSocket(server: HTTPServer) {
   });
 
   setSocketInstance(io);
+  startNeedHelpAutoBump(io);
 
   const userSockets = new Map<string, Set<string>>();
   const userIdMapping = new Map<string, string>();
+  const socketPresence = new Map<string, "online" | "away" | "busy">();
+
+  const resolvePresence = (userId: string, oauthId?: string): "online" | "away" | "busy" => {
+    const socketIds = new Set<string>([...(userSockets.get(userId) || [])]);
+    if (oauthId && oauthId !== userId) {
+      for (const socketId of userSockets.get(oauthId) || []) socketIds.add(socketId);
+    }
+
+    let hasAway = false;
+    let hasBusy = false;
+    for (const socketId of socketIds) {
+      const status = socketPresence.get(socketId) || "online";
+      if (status === "online") return "online";
+      if (status === "busy") hasBusy = true;
+      if (status === "away") hasAway = true;
+    }
+
+    if (hasBusy) return "busy";
+    if (hasAway) return "away";
+    return "online";
+  };
+
+  const emitPresence = (userId: string, oauthId?: string, lastSeen: string | null = null) => {
+    const status = resolvePresence(userId, oauthId);
+    io.emit("user_status", {
+      userId,
+      status,
+      lastSeen: status === "away" ? lastSeen || new Date().toISOString() : null,
+    });
+
+    if (oauthId && oauthId !== userId) {
+      io.emit("user_status", {
+        userId: oauthId,
+        status,
+        lastSeen: status === "away" ? lastSeen || new Date().toISOString() : null,
+      });
+    }
+  };
 
   const context: SocketContext = {
     io,
@@ -92,6 +133,10 @@ export function initializeSocket(server: HTTPServer) {
       }
       return ids;
     },
+    updateUserPresence: (socket, status) => {
+      socketPresence.set(socket.id, status);
+      emitPresence(socket.userId, socket.oauthId);
+    },
     registerUserSocket: async (socket) => {
       const user = await markUserOnline(socket.userId);
       const dbId = user?._id?.toString?.() || socket.userId;
@@ -99,6 +144,7 @@ export function initializeSocket(server: HTTPServer) {
 
       socket.userId = dbId;
       socket.oauthId = oauthId;
+      socketPresence.set(socket.id, "online");
 
       addSocketForUser(userSockets, dbId, socket.id);
       socket.join(`user:${dbId}`);
@@ -109,16 +155,14 @@ export function initializeSocket(server: HTTPServer) {
         socket.join(`user:${oauthId}`);
       }
 
-      io.emit("user_status", { userId: dbId, status: "online", lastSeen: null });
-      if (oauthId && oauthId !== dbId) {
-        io.emit("user_status", { userId: oauthId, status: "online", lastSeen: null });
-      }
+      emitPresence(dbId, oauthId);
 
       socket.emit("initial_online_users", context.getOnlineUserIds());
     },
     unregisterUserSocket: async (socket) => {
       const dbId = socket.userId;
       const oauthId = socket.oauthId;
+      socketPresence.delete(socket.id);
 
       removeSocketForUser(userSockets, dbId, socket.id);
       if (oauthId && oauthId !== dbId) {
@@ -191,7 +235,15 @@ async function authenticateSocket(socket: any) {
   if (!payload) {
     const bearerToken = extractBearerToken(socket);
     if (bearerToken) {
-      payload = jwt.verify(bearerToken, secret) as SocketJwtPayload;
+      payload = await parseSocketToken(bearerToken, secret);
+    }
+  }
+
+  // Fallback for Socket.IO handshakes where next-auth helpers cannot read token.
+  if (!payload) {
+    const cookieToken = extractSessionTokenFromCookies(socket);
+    if (cookieToken) {
+      payload = await parseSocketToken(cookieToken, secret);
     }
   }
 
@@ -224,6 +276,95 @@ function extractBearerToken(socket: any) {
   }
 
   return null;
+}
+
+let needHelpBumpTimer: NodeJS.Timeout | null = null;
+
+function startNeedHelpAutoBump(io: SocketIOServer) {
+  if (needHelpBumpTimer) return;
+
+  needHelpBumpTimer = setInterval(async () => {
+    try {
+      const postsCollection = await getCollection(COLLECTIONS.POSTS);
+      const threshold = new Date(Date.now() - 30 * 60 * 1000);
+      const nowIso = new Date().toISOString();
+
+      const result = await postsCollection.updateMany(
+        {
+          postType: "need_help",
+          createdAt: { $lt: threshold },
+          $and: [
+            { $or: [{ "helpContext.status": "open" }, { "helpContext.status": { $exists: false } }] },
+            {
+              $or: [
+                { "helpContext.lastBumpedAt": { $exists: false } },
+                { "helpContext.lastBumpedAt": { $lt: threshold.toISOString() } },
+              ],
+            },
+          ],
+        },
+        {
+          $set: {
+            "helpContext.lastBumpedAt": nowIso,
+            updatedAt: new Date(),
+          },
+        }
+      );
+
+      if (result.modifiedCount > 0) {
+        io.emit("need_help_bumped", { bumped: result.modifiedCount, at: nowIso });
+      }
+    } catch (error) {
+      console.error("[NeedHelp] auto-bump failed:", error);
+    }
+  }, 5 * 60 * 1000);
+}
+
+function extractSessionTokenFromCookies(socket: any) {
+  const cookieHeader = socket?.handshake?.headers?.cookie;
+  if (!cookieHeader || typeof cookieHeader !== "string") return null;
+
+  const cookieMap = new Map<string, string>();
+  cookieHeader.split(";").forEach((entry: string) => {
+    const trimmed = entry.trim();
+    const separatorIndex = trimmed.indexOf("=");
+    if (separatorIndex <= 0) return;
+    const key = trimmed.slice(0, separatorIndex);
+    const value = trimmed.slice(separatorIndex + 1);
+    cookieMap.set(key, decodeURIComponent(value));
+  });
+
+  const baseNames = ["next-auth.session-token", "__Secure-next-auth.session-token"];
+  for (const baseName of baseNames) {
+    const direct = cookieMap.get(baseName);
+    if (direct) return direct;
+
+    const chunks = Array.from(cookieMap.entries())
+      .filter(([key]) => key.startsWith(`${baseName}.`))
+      .sort((a, b) => {
+        const aIndex = Number(a[0].split(".").pop() || "0");
+        const bIndex = Number(b[0].split(".").pop() || "0");
+        return aIndex - bIndex;
+      })
+      .map(([, value]) => value);
+
+    if (chunks.length > 0) return chunks.join("");
+  }
+
+  return null;
+}
+
+async function parseSocketToken(token: string, secret: string): Promise<SocketJwtPayload | null> {
+  try {
+    return jwt.verify(token, secret) as SocketJwtPayload;
+  } catch {
+    try {
+      const decoded = await decode({ token, secret });
+      return (decoded as SocketJwtPayload) || null;
+    } catch {
+      return null;
+    }
+  }
 }
 
 function addSocketForUser(userSockets: Map<string, Set<string>>, userId: string, socketId: string) {

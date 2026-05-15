@@ -18,93 +18,84 @@ export async function getMessageThreadsForUser(userId: string) {
   const usersCollection = await getCollection(COLLECTIONS.USERS);
   const userIds = await getUserIdentityVariants(userId);
 
-  const [sentMessages, receivedMessages] = await Promise.all([
-    messagesCollection.find({ senderId: { $in: userIds } }).toArray(),
-    messagesCollection.find({ receiverId: { $in: userIds } }).toArray(),
-  ]);
+  const conversations = await messagesCollection
+    .aggregate([
+      {
+        $match: {
+          $or: [{ senderId: { $in: userIds } }, { receiverId: { $in: userIds } }],
+        },
+      },
+      { $sort: { createdAt: -1 } },
+      {
+        $addFields: {
+          otherUserId: {
+            $cond: [{ $in: ["$senderId", userIds] }, "$receiverId", "$senderId"],
+          },
+          unreadForCurrent: {
+            $cond: [
+              {
+                $and: [
+                  { $in: ["$receiverId", userIds] },
+                  { $eq: ["$read", false] },
+                ],
+              },
+              1,
+              0,
+            ],
+          },
+        },
+      },
+      {
+        $group: {
+          _id: "$otherUserId",
+          lastMessage: { $first: "$$ROOT" },
+          unreadCount: { $sum: "$unreadForCurrent" },
+        },
+      },
+      { $sort: { "lastMessage.createdAt": -1 } },
+    ])
+    .toArray();
 
-  const chatUserIds = new Set<string>();
-  sentMessages.forEach((message) => chatUserIds.add(message.receiverId));
-  receivedMessages.forEach((message) => chatUserIds.add(message.senderId));
+  const otherIds = conversations.map((conversation: any) => conversation._id).filter(Boolean);
+  const otherObjectIds = otherIds
+    .map((id: string) => toObjectId(id))
+    .filter((id): id is NonNullable<typeof id> => id !== null);
 
-  const chatsMap = new Map<string, { userId: string; originalIds: Set<string>; user: any }>();
+  const users = await usersCollection
+    .find({
+      $or: [{ _id: { $in: otherObjectIds } }, { id: { $in: otherIds } }],
+    })
+    .toArray();
 
-  for (const otherId of chatUserIds) {
-    const otherIdObj = toObjectId(otherId);
-    const otherUser = await usersCollection.findOne({
-      $or: [{ _id: otherIdObj || (otherId as any) }, { id: otherId }],
-    });
+  const userByDbId = new Map(users.map((user) => [user._id?.toString?.(), user]));
+  const userByAltId = new Map(users.filter((user) => user.id).map((user) => [user.id, user]));
 
-    if (!otherUser) continue;
+  return conversations
+    .map((conversation: any) => {
+      const otherId = conversation._id as string;
+      const otherUser = userByDbId.get(otherId) || userByAltId.get(otherId);
+      if (!otherUser) return null;
 
-    const primaryId = otherUser._id.toString();
-    const existing = chatsMap.get(primaryId);
-
-    if (!existing) {
-      chatsMap.set(primaryId, {
-        userId: primaryId,
-        originalIds: new Set([otherId]),
-        user: publicUser(otherUser),
-      });
-    } else {
-      existing.originalIds.add(otherId);
-      if (otherId !== primaryId && !existing.user.alternativeIds.includes(otherId)) {
-        existing.user.alternativeIds.push(otherId);
-      }
-    }
-  }
-
-  const chats = await Promise.all(
-    Array.from(chatsMap.values()).map(async (chatInfo) => {
-      const participantIds = Array.from(chatInfo.originalIds);
-      const participantIdObj = toObjectId(chatInfo.userId);
-      if (!participantIdObj) return null;
-
-      const participantUser = await usersCollection.findOne({ _id: participantIdObj });
-      if (participantUser?.id && !participantIds.includes(participantUser.id)) {
-        participantIds.push(participantUser.id);
-      }
-
-      const [lastMessage] = await messagesCollection
-        .find({
-          $or: [
-            { senderId: { $in: userIds }, receiverId: { $in: participantIds } },
-            { senderId: { $in: participantIds }, receiverId: { $in: userIds } },
-          ],
-        })
-        .sort({ createdAt: -1 })
-        .limit(1)
-        .toArray();
-
-      const unreadCount = await messagesCollection.countDocuments({
-        senderId: { $in: participantIds },
-        receiverId: { $in: userIds },
-        read: false,
-      });
+      const normalizedId = otherUser._id.toString();
+      const lastMessage = conversation.lastMessage;
 
       return {
-        id: chatInfo.userId,
-        userId: chatInfo.userId,
-        user: chatInfo.user,
+        id: normalizedId,
+        userId: normalizedId,
+        user: publicUser(otherUser),
         lastMessage: lastMessage
           ? {
               content: lastMessage.content,
               createdAt: lastMessage.createdAt,
               read: lastMessage.read,
-              senderId: chatInfo.originalIds.has(lastMessage.senderId)
-                ? chatInfo.userId
-                : lastMessage.senderId,
-              receiverId: chatInfo.originalIds.has(lastMessage.receiverId)
-                ? chatInfo.userId
-                : lastMessage.receiverId,
+              senderId: lastMessage.senderId === otherId ? normalizedId : lastMessage.senderId,
+              receiverId: lastMessage.receiverId === otherId ? normalizedId : lastMessage.receiverId,
             }
           : undefined,
-        unreadCount,
+        unreadCount: conversation.unreadCount || 0,
       };
     })
-  );
-
-  return chats.filter(Boolean);
+    .filter(Boolean);
 }
 
 export async function createMessage(input: CreateMessageInput) {

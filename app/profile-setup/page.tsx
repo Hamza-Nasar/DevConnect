@@ -37,6 +37,9 @@ export default function ProfileSetupPage() {
         name: "",
         bio: "",
         avatar: "",
+        stacks: "",
+        goal: "learning",
+        experience: "intermediate",
     });
     const [loading, setLoading] = useState(false);
 
@@ -58,6 +61,23 @@ export default function ProfileSetupPage() {
                 name: session.user.name || prev.name,
                 avatar: session.user.image || DEFAULT_AVATARS[0],
             }));
+
+            // If profile already completed in DB, don't show setup again.
+            const checkProfileCompletion = async () => {
+                try {
+                    const res = await fetch("/api/profile/basic", { cache: "no-store" });
+                    if (!res.ok) return;
+                    const profile = await res.json();
+                    if (profile?.username) {
+                        localStorage.setItem("profileSetupCompleted", "true");
+                        router.push("/feed");
+                    }
+                } catch {
+                    // no-op
+                }
+            };
+
+            void checkProfileCompletion();
         }
     }, [status, session, router]);
 
@@ -144,6 +164,11 @@ export default function ProfileSetupPage() {
                     username: formData.username,
                     bio: formData.bio,
                     avatar: formData.avatar,
+                    developerProfile: {
+                        stacks: formData.stacks.split(",").map((item) => item.trim().toLowerCase()).filter(Boolean),
+                        goal: formData.goal,
+                        experience: formData.experience,
+                    },
                 }),
             });
 
@@ -256,6 +281,45 @@ export default function ProfileSetupPage() {
                                 value={formData.bio}
                                 onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
                             />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="stacks">Tech Stacks (comma separated)</Label>
+                            <Input
+                                id="stacks"
+                                placeholder="react,nextjs,nodejs"
+                                value={formData.stacks}
+                                onChange={(e) => setFormData({ ...formData, stacks: e.target.value })}
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="goal">Primary Goal</Label>
+                            <select
+                                id="goal"
+                                value={formData.goal}
+                                onChange={(e) => setFormData({ ...formData, goal: e.target.value })}
+                                className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+                            >
+                                <option value="learning">Learning</option>
+                                <option value="freelance">Freelance</option>
+                                <option value="hiring">Hiring</option>
+                                <option value="networking">Networking</option>
+                            </select>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="experience">Experience Level</Label>
+                            <select
+                                id="experience"
+                                value={formData.experience}
+                                onChange={(e) => setFormData({ ...formData, experience: e.target.value })}
+                                className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+                            >
+                                <option value="beginner">Beginner</option>
+                                <option value="intermediate">Intermediate</option>
+                                <option value="advanced">Advanced</option>
+                            </select>
                         </div>
 
                         <Button type="submit" className="w-full" disabled={loading}>

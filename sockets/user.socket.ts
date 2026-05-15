@@ -103,12 +103,8 @@ export function registerUserSocket(socket: AuthenticatedSocket, context: SocketC
     context.io.to(`user:${data.followingId}`).emit("unfollowed", { followerId: socket.userId });
   });
 
-  socket.on("update_presence", (data: { status: "online" | "away" }) => {
-    context.io.emit("user_status", {
-      userId: socket.userId,
-      status: data.status === "away" ? "away" : "online",
-      lastSeen: data.status === "away" ? new Date().toISOString() : null,
-    });
+  socket.on("update_presence", (data: { status: "online" | "away" | "busy" }) => {
+    context.updateUserPresence(socket, data.status);
   });
 
   socket.on("disconnect", async () => {

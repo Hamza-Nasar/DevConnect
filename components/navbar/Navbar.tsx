@@ -28,6 +28,7 @@ import {
   Share2,
   MoreHorizontal,
   Sparkles,
+  LifeBuoy,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigationVisibility } from "@/lib/navigation-context";
@@ -141,6 +142,7 @@ export default function Navbar() {
     { icon: Code, label: "Code Snippets", path: "/code-snippets", badge: null },
     { icon: Video, label: "Live", path: "/live", badge: "LIVE" },
     { icon: Sparkles, label: "Recommendations", path: "/recommendations", badge: null },
+    { icon: LifeBuoy, label: "Help Queue", path: "/need-help-queue", badge: null },
   ];
 
   const quickActions = [

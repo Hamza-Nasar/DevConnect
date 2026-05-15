@@ -21,26 +21,48 @@ export default function FeedPage() {
     const router = useRouter();
     const [isDeleting, setIsDeleting] = useState<string | null>(null);
     const [activeFilter, setActiveFilter] = useState("All");
+    const [showActivationCard, setShowActivationCard] = useState(false);
 
     useEffect(() => {
-        if (status === "unauthenticated") {
-            router.push("/login");
-        } else if (status === "authenticated") {
-            // Only redirect to profile setup if username is missing
-            // This should only happen on first signup/login, not on subsequent logins
-            // If user already has username in session, they've completed setup
-            if (!(session?.user as any)?.username) {
+        const run = async () => {
+            if (status === "unauthenticated") {
+                router.push("/login");
+                return;
+            }
 
-                // Check localStorage to see if user has completed setup before
-                const hasCompletedSetup = localStorage.getItem('profileSetupCompleted');
+            if (status !== "authenticated") return;
+
+            // Reliable profile-completion check from DB (not only session/localStorage).
+            // Session can be stale after relogin for OAuth users.
+            try {
+                const basicRes = await fetch("/api/profile/basic", { cache: "no-store" });
+                if (basicRes.ok) {
+                    const profile = await basicRes.json();
+                    const hasUsername = !!profile?.username;
+                    if (hasUsername) {
+                        localStorage.setItem("profileSetupCompleted", "true");
+                    } else {
+                        router.push("/profile-setup");
+                        return;
+                    }
+                } else {
+                    const hasCompletedSetup = localStorage.getItem("profileSetupCompleted") === "true";
+                    if (!hasCompletedSetup) {
+                        router.push("/profile-setup");
+                        return;
+                    }
+                }
+            } catch {
+                const hasCompletedSetup = localStorage.getItem("profileSetupCompleted") === "true";
                 if (!hasCompletedSetup) {
                     router.push("/profile-setup");
+                    return;
                 }
             }
 
             // Handle postId from URL (for notifications)
             const urlParams = new URLSearchParams(window.location.search);
-            const postId = urlParams.get('postId');
+            const postId = urlParams.get("postId");
             if (postId) {
                 setTimeout(() => {
                     const postElement = document.getElementById(`post-${postId}`);
@@ -51,12 +73,20 @@ export default function FeedPage() {
                             postElement.classList.remove("ring-2", "ring-purple-500", "ring-opacity-75");
                         }, 3000);
                     }
-                    // Clean up URL
-                    window.history.replaceState({}, '', '/feed');
+                    window.history.replaceState({}, "", "/feed");
                 }, 1000);
             }
-        }
-    }, [status, session, router]);
+        };
+
+        void run();
+    }, [status, router]);
+
+    useEffect(() => {
+        if (status !== "authenticated") return;
+        const isDone = localStorage.getItem("activationFirstActionDone") === "1";
+        const dismissed = localStorage.getItem("activationCardDismissed") === "1";
+        setShowActivationCard(!isDone && !dismissed);
+    }, [status]);
 
     // Ensure socket connection and join user room for real-time updates
     useEffect(() => {
@@ -66,9 +96,14 @@ export default function FeedPage() {
                 // Join user room for real-time notifications
                 socket.emit("join", session.user.id);
 
-                socket.on("connect", () => {
+                const onConnect = () => {
                     socket.emit("join", session.user?.id || "");
-                });
+                };
+
+                socket.on("connect", onConnect);
+                return () => {
+                    socket.off("connect", onConnect);
+                };
             }
         }
     }, [status, session?.user?.id]);
@@ -127,6 +162,7 @@ export default function FeedPage() {
                                                 { label: "All", icon: "🔥" },
                                                 { label: "Trending", icon: "📈" },
                                                 { label: "Latest", icon: "🆕" },
+                                                { label: "Need Help", icon: "🆘" },
                                                 { label: "Photos", icon: "📷" },
                                                 { label: "Videos", icon: "🎥" },
                                                 { label: "Polls", icon: "📊" },
@@ -149,6 +185,36 @@ export default function FeedPage() {
                                     </div>
                                 </div>
                             </ScrollReveal>
+
+                            {showActivationCard && (
+                                <ScrollReveal delay={0.3}>
+                                    <div className="mb-6 rounded-2xl border border-blue-500/30 bg-blue-500/10 p-4">
+                                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                            <div>
+                                                <p className="text-sm font-semibold text-blue-200">First Action Goal</p>
+                                                <p className="text-xs text-blue-100/80">Create your first post in the next 10 minutes to unlock personalized feed learning.</p>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={() => router.push("/create-post?type=need_help")}
+                                                    className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-500"
+                                                >
+                                                    Ask Need Help
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        localStorage.setItem("activationCardDismissed", "1");
+                                                        setShowActivationCard(false);
+                                                    }}
+                                                    className="rounded-lg border border-gray-600 px-3 py-2 text-xs font-semibold text-gray-300 hover:bg-gray-800"
+                                                >
+                                                    Dismiss
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </ScrollReveal>
+                            )}
 
                             <ScrollReveal delay={0.4}>
                                 <PostList onDelete={handleDelete} filter={activeFilter} />

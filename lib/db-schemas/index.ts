@@ -23,6 +23,13 @@ export interface UserSchema {
   postsCount?: number;
   followersCount?: number;
   followingCount?: number;
+  skills?: string[];
+  interests?: string[];
+  developerProfile?: {
+    stacks?: string[];
+    goal?: "learning" | "freelance" | "hiring" | "networking";
+    experience?: "beginner" | "intermediate" | "advanced";
+  };
 }
 
 export interface AccountSchema {
@@ -52,7 +59,17 @@ export interface PostSchema {
   hashtags?: string[];
   location?: string;
   isPublic?: boolean;
-  postType?: "tip" | "bug" | "library" | "announcement" | "regular";
+  postType?: "tip" | "bug" | "library" | "announcement" | "regular" | "need_help" | "poll" | "story" | "reel";
+  helpContext?: {
+    urgency?: "low" | "medium" | "high";
+    stackTags?: string[];
+    status?: "open" | "investigating" | "solved";
+    lastBumpedAt?: string;
+  };
+  hasAcceptedAnswer?: boolean;
+  acceptedAnswerId?: string | null;
+  solvedAt?: string | null;
+  solvedSummary?: string | null;
   codeSnippet?: {
     code: string;
     language: string;

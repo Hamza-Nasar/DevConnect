@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { commentId, postId } = await req.json();
+    const { commentId, postId, summary } = await req.json();
 
     if (!commentId || !postId) {
       return NextResponse.json(
@@ -54,7 +54,15 @@ export async function POST(req: NextRequest) {
     // Update post to mark as answered
     await postsCollection.updateOne(
       { _id: postIdObj },
-      { $set: { hasAcceptedAnswer: true, acceptedAnswerId: commentId } }
+      {
+        $set: {
+          hasAcceptedAnswer: true,
+          acceptedAnswerId: commentId,
+          solvedAt: new Date().toISOString(),
+          solvedSummary: summary || null,
+          "helpContext.status": "solved",
+        },
+      }
     );
 
     return NextResponse.json({ success: true });

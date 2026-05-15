@@ -36,6 +36,7 @@ import getSocket from "@/lib/socket";
 
 interface LiveStream {
   id: string;
+  rtcRoomId?: string;
   title: string;
   description: string;
   thumbnail?: string;
@@ -92,34 +93,34 @@ export default function LivePage() {
       const socket = getSocket();
       if (socket) {
         // Join live stream room
-        socket.emit("join_live_stream", { streamId: selectedStream.id });
+        socket.emit("join_stream", { streamId: selectedStream.rtcRoomId || selectedStream.id, isHost: false });
         
         // Listen for realtime updates
-        socket.on("live_comment", (comment: LiveComment) => {
-          if (comment && comment.id) {
-            setComments((prev) => {
-              if (prev.some(c => c.id === comment.id)) return prev;
-              return [...prev, comment];
-            });
-          }
+        socket.on("stream_comment", (payload: { user: string; message: string }) => {
+          if (!payload?.message) return;
+          setComments((prev) => [
+            ...prev,
+            {
+              id: `socket-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+              user: { id: "socket", name: payload.user || "User" },
+              message: payload.message,
+              timestamp: new Date().toISOString(),
+            },
+          ]);
         });
         
-        socket.on("live_like", (data: { streamId: string; likesCount: number }) => {
-          if (data.streamId === selectedStream.id) {
-            setSelectedStream((prev) => prev ? { ...prev, likesCount: data.likesCount } : null);
-            setLiveStreams((prev) =>
-              prev.map((s) => s.id === data.streamId ? { ...s, likesCount: data.likesCount } : s)
-            );
-          }
+        socket.on("stream_like", () => {
+          setSelectedStream((prev) => (prev ? { ...prev, likesCount: prev.likesCount + 1 } : null));
+          setLiveStreams((prev) =>
+            prev.map((s) => (s.id === selectedStream.id ? { ...s, likesCount: s.likesCount + 1 } : s))
+          );
         });
         
-        socket.on("live_viewers", (data: { streamId: string; viewersCount: number }) => {
-          if (data.streamId === selectedStream.id) {
-            setSelectedStream((prev) => prev ? { ...prev, viewersCount: data.viewersCount } : null);
-            setLiveStreams((prev) =>
-              prev.map((s) => s.id === data.streamId ? { ...s, viewersCount: data.viewersCount } : s)
-            );
-          }
+        socket.on("viewer_count", (count: number) => {
+          setSelectedStream((prev) => (prev ? { ...prev, viewersCount: count } : null));
+          setLiveStreams((prev) =>
+            prev.map((s) => (s.id === selectedStream.id ? { ...s, viewersCount: count } : s))
+          );
         });
         
         socket.on("live_gift", (data: { streamId: string; gift: any }) => {
@@ -142,10 +143,10 @@ export default function LivePage() {
       
       return () => {
         if (socket) {
-          socket.emit("leave_live_stream", { streamId: selectedStream.id });
-          socket.off("live_comment");
-          socket.off("live_like");
-          socket.off("live_viewers");
+          socket.emit("leave_stream", { streamId: selectedStream.rtcRoomId || selectedStream.id });
+          socket.off("stream_comment");
+          socket.off("stream_like");
+          socket.off("viewer_count");
           socket.off("live_gift");
         }
       };
@@ -157,7 +158,10 @@ export default function LivePage() {
       const res = await fetch("/api/live");
       if (res.ok) {
         const data = await res.json();
-        setLiveStreams(data.streams || []);
+        setLiveStreams((data.streams || []).map((stream: any) => ({
+          ...stream,
+          rtcRoomId: stream.rtcRoomId || stream.streamerId || stream.streamer?.id || stream.id,
+        })));
       }
     } catch (error) {
       console.error("Error fetching live streams:", error);
@@ -194,9 +198,10 @@ export default function LivePage() {
         // Emit socket event for realtime update
         const socket = getSocket();
         if (socket && data.comment) {
-          socket.emit("live_comment", {
-            streamId: selectedStream.id,
-            comment: data.comment,
+          socket.emit("stream_comment", {
+            streamId: selectedStream.rtcRoomId || selectedStream.id,
+            user: session.user?.name || "User",
+            message: data.comment?.message || commentInput,
           });
         }
         
@@ -221,9 +226,8 @@ export default function LivePage() {
         // Emit socket event for realtime update
         const socket = getSocket();
         if (socket) {
-          socket.emit("live_like", {
-            streamId: selectedStream.id,
-            likesCount: data.likesCount || selectedStream.likesCount + 1,
+          socket.emit("stream_like", {
+            streamId: selectedStream.rtcRoomId || selectedStream.id,
           });
         }
         
@@ -351,7 +355,7 @@ export default function LivePage() {
                             const socket = getSocket();
                             if (socket) {
                               socket.emit("live_gift", {
-                                streamId: selectedStream.id,
+                                streamId: selectedStream.rtcRoomId || selectedStream.id,
                                 gift: {
                                   type: "heart",
                                   user: {

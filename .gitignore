@@ -29,6 +29,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+devserver-live.log
 
 # env files (can opt-in for committing if needed)
 .env*
@@ -47,3 +48,6 @@ next-env.d.ts
 # OpenNext
 .open-next
 .wrangler-bundle
+
+# local test artifacts
+.playwright-mcp/

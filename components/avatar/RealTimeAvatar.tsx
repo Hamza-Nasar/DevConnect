@@ -36,19 +36,20 @@ export default function RealTimeAvatar({
     }
 
     const updateStatus = () => {
-      let isOnline = onlineStatusStore.isUserOnline(userId);
+      let resolvedStatus = onlineStatusStore.getUserStatus(userId);
 
-      // Check alternative IDs if main ID is offline
-      if (!isOnline && alternativeIds.length > 0) {
+      // Check alternative IDs when primary id looks offline.
+      if (resolvedStatus === "offline" && alternativeIds.length > 0) {
         for (const altId of alternativeIds) {
-          if (onlineStatusStore.isUserOnline(altId)) {
-            isOnline = true;
+          const altStatus = onlineStatusStore.getUserStatus(altId);
+          if (altStatus !== "offline") {
+            resolvedStatus = altStatus;
             break;
           }
         }
       }
 
-      setStatus(isOnline ? "online" : (initialStatus || "offline"));
+      setStatus(resolvedStatus !== "offline" ? resolvedStatus : (initialStatus || "offline"));
     };
 
     // Initial check

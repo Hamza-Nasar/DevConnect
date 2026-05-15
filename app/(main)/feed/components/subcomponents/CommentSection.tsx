@@ -29,6 +29,10 @@ interface CommentSectionProps {
     onPostComment: (content: string, parentId?: string) => void;
     onDeleteComment: (id: string) => void;
     currentUserId?: string;
+    isPostOwner?: boolean;
+    canAcceptAnswer?: boolean;
+    acceptedAnswerId?: string | null;
+    onAcceptAnswer?: (commentId: string) => void;
 }
 
 interface CommentItemProps {
@@ -38,6 +42,10 @@ interface CommentItemProps {
     currentUserId?: string;
     onPostComment: (content: string, parentId?: string) => void;
     onDeleteComment: (id: string) => void;
+    isPostOwner?: boolean;
+    canAcceptAnswer?: boolean;
+    acceptedAnswerId?: string | null;
+    onAcceptAnswer?: (commentId: string) => void;
 }
 
 function CommentItem({
@@ -47,6 +55,11 @@ function CommentItem({
     currentUserId,
     onPostComment,
     onDeleteComment
+    ,
+    isPostOwner,
+    canAcceptAnswer,
+    acceptedAnswerId,
+    onAcceptAnswer
 }: CommentItemProps) {
     const [isReplying, setIsReplying] = useState(false);
     const [replyContent, setReplyContent] = useState("");
@@ -55,6 +68,8 @@ function CommentItem({
     const replies = useMemo(() =>
         allComments.filter(c => c.parentId === (comment.id || comment._id)),
         [allComments, comment.id, comment._id]);
+    const commentId = comment.id || comment._id || "";
+    const isAccepted = acceptedAnswerId === commentId;
 
     const handleSendReply = () => {
         if (!replyContent.trim()) return;
@@ -129,6 +144,15 @@ function CommentItem({
                             Delete
                         </button>
                     )}
+
+                    {isPostOwner && canAcceptAnswer && (
+                        <button
+                            onClick={() => onAcceptAnswer?.(commentId)}
+                            className={`text-[11px] font-bold transition uppercase tracking-wider ${isAccepted ? "text-green-400" : "text-gray-500 hover:text-green-400"}`}
+                        >
+                            {isAccepted ? "Accepted" : "Accept"}
+                        </button>
+                    )}
                 </div>
 
                 {/* Reply Input */}
@@ -175,6 +199,10 @@ function CommentItem({
                                     currentUserId={currentUserId}
                                     onPostComment={onPostComment}
                                     onDeleteComment={onDeleteComment}
+                                    isPostOwner={isPostOwner}
+                                    canAcceptAnswer={canAcceptAnswer}
+                                    acceptedAnswerId={acceptedAnswerId}
+                                    onAcceptAnswer={onAcceptAnswer}
                                 />
                             ))}
                         </div>
@@ -191,6 +219,10 @@ export default function CommentSection({
     onPostComment,
     onDeleteComment,
     currentUserId,
+    isPostOwner,
+    canAcceptAnswer,
+    acceptedAnswerId,
+    onAcceptAnswer,
 }: CommentSectionProps) {
     const [mainInput, setMainInput] = useState("");
 
@@ -252,6 +284,10 @@ export default function CommentSection({
                                 currentUserId={currentUserId}
                                 onPostComment={onPostComment}
                                 onDeleteComment={onDeleteComment}
+                                isPostOwner={isPostOwner}
+                                canAcceptAnswer={canAcceptAnswer}
+                                acceptedAnswerId={acceptedAnswerId}
+                                onAcceptAnswer={onAcceptAnswer}
                             />
                         ))}
                     </AnimatePresence>

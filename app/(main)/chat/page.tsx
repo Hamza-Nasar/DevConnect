@@ -496,22 +496,47 @@ export default function ChatPage() {
     };
   }, [session?.user?.id]);
 
-  // Presence Tracking (Active/Away)
+  // Presence Tracking (Active/Away) with debounce to prevent status flapping.
   useEffect(() => {
     const socket = getSocket();
     if (!socket || !session?.user?.id) return;
 
-    const handlePresenceChange = (status: "online" | "away") => {
-      socket.emit("update_presence", { status });
+    let awayTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const markOnline = () => {
+      if (awayTimer) {
+        clearTimeout(awayTimer);
+        awayTimer = null;
+      }
+      socket.emit("update_presence", { status: "online" });
     };
 
-    const onFocus = () => handlePresenceChange("online");
-    const onBlur = () => handlePresenceChange("away");
+    const scheduleAway = () => {
+      if (awayTimer) clearTimeout(awayTimer);
+      awayTimer = setTimeout(() => {
+        socket.emit("update_presence", { status: "away" });
+      }, 45000);
+    };
 
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        markOnline();
+      } else {
+        scheduleAway();
+      }
+    };
+
+    const onFocus = () => markOnline();
+    const onBlur = () => scheduleAway();
+
+    markOnline();
+    document.addEventListener("visibilitychange", onVisibilityChange);
     window.addEventListener("focus", onFocus);
     window.addEventListener("blur", onBlur);
 
     return () => {
+      if (awayTimer) clearTimeout(awayTimer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("blur", onBlur);
     };

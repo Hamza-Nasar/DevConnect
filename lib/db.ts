@@ -163,11 +163,29 @@ export async function createPost(postData: any) {
   return collection.findOne({ _id: result.insertedId });
 }
 
-export async function findPosts(limit: number = 20, skip: number = 0) {
+export async function findPosts(
+  limit: number = 20,
+  skip: number = 0,
+  filter: string = "All"
+) {
   const collection = await getCollection(COLLECTIONS.POSTS);
+  const normalizedFilter = (filter || "All").toLowerCase();
+  const query: Record<string, any> = {};
+
+  if (normalizedFilter === "photos") {
+    query.images = { $exists: true, $ne: [] };
+  } else if (normalizedFilter === "videos") {
+    query.video = { $ne: null };
+  } else if (normalizedFilter === "polls") {
+    query.postType = "poll";
+  } else if (normalizedFilter === "need help") {
+    query.postType = "need_help";
+  }
+
   return collection
-    .find({})
+    .find(query)
     .sort({ createdAt: -1 })
+    .maxTimeMS(5000)
     .limit(limit)
     .skip(skip)
     .toArray();

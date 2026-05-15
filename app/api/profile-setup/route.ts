@@ -12,7 +12,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const { username, bio, skills, location, website, avatar } = await req.json();
+        const { username, bio, skills, location, website, avatar, developerProfile } = await req.json();
 
         const user = await findUserByEmail(session.user.email);
         if (!user) {
@@ -35,6 +35,14 @@ export async function POST(req: Request) {
         if (username) updateData.username = username.trim();
         if (bio !== undefined) updateData.bio = bio?.trim() || null;
         if (skills) updateData.skills = skills;
+        if (developerProfile) {
+            updateData.developerProfile = {
+                stacks: Array.isArray(developerProfile.stacks) ? developerProfile.stacks : [],
+                goal: developerProfile.goal || null,
+                experience: developerProfile.experience || null,
+            };
+            updateData.interests = Array.isArray(developerProfile.stacks) ? developerProfile.stacks : [];
+        }
         if (location !== undefined) updateData.location = location?.trim() || null;
         if (website !== undefined) updateData.website = website?.trim() || null;
         if (avatar) updateData.avatar = avatar; // Allow avatar update
@@ -55,6 +63,7 @@ export async function POST(req: Request) {
             skills: updatedUser?.skills || [],
             location: updatedUser?.location || null,
             website: updatedUser?.website || null,
+            developerProfile: updatedUser?.developerProfile || null,
         });
     } catch (error: any) {
         console.error("Error updating profile:", error);

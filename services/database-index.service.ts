@@ -7,20 +7,30 @@ let indexesInitialized = false;
 export async function ensureDatabaseIndexes() {
   if (indexesInitialized) return;
 
-  const [users, messages, posts, follows] = await Promise.all([
+  const [users, messages, posts, follows, notifications, comments] = await Promise.all([
     getCollection(COLLECTIONS.USERS),
     getCollection(COLLECTIONS.MESSAGES),
     getCollection(COLLECTIONS.POSTS),
     getCollection(COLLECTIONS.FOLLOWS),
+    getCollection(COLLECTIONS.NOTIFICATIONS),
+    getCollection(COLLECTIONS.COMMENTS),
   ]);
 
   await Promise.all([
     createIndexIfMissing(users, "users.email", { email: 1 }, { unique: true, sparse: true, background: true }),
     createIndexIfMissing(users, "users.username", { username: 1 }, { unique: true, sparse: true, background: true }),
+    createIndexIfMissing(users, "users.id", { id: 1 }, { sparse: true, background: true }),
     createIndexIfMissing(messages, "messages.conversation_created", { conversationId: 1, createdAt: -1 }, { background: true }),
     createIndexIfMissing(messages, "messages.participants_created", { senderId: 1, receiverId: 1, createdAt: -1 }, { background: true }),
+    createIndexIfMissing(messages, "messages.receiver_read_created", { receiverId: 1, read: 1, createdAt: -1 }, { background: true }),
     createIndexIfMissing(posts, "posts.createdAt", { createdAt: -1 }, { background: true }),
+    createIndexIfMissing(posts, "posts.type_created", { postType: 1, createdAt: -1 }, { background: true }),
+    createIndexIfMissing(posts, "posts.need_help_queue", { postType: 1, "helpContext.status": 1, createdAt: -1 }, { background: true }),
     createIndexIfMissing(follows, "follows.unique_pair", { followerId: 1, followingId: 1 }, { unique: true, background: true }),
+    createIndexIfMissing(follows, "follows.following", { followingId: 1 }, { background: true }),
+    createIndexIfMissing(notifications, "notifications.user_created", { userId: 1, createdAt: -1 }, { background: true }),
+    createIndexIfMissing(notifications, "notifications.user_read_created", { userId: 1, read: 1, createdAt: -1 }, { background: true }),
+    createIndexIfMissing(comments, "comments.post_created", { postId: 1, createdAt: 1 }, { background: true }),
   ]);
 
   indexesInitialized = true;

@@ -56,6 +56,8 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(post.content);
   const [editTitle, setEditTitle] = useState(post.title || "");
+  const [acceptedAnswerId, setAcceptedAnswerId] = useState<string | null>(post.acceptedAnswerId || null);
+  const [isAcceptingAnswer, setIsAcceptingAnswer] = useState(false);
 
   useEffect(() => {
     if (showComments) fetchComments();
@@ -63,6 +65,7 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
 
   // Track view when post is visible
   useEffect(() => {
+    if (process.env.NODE_ENV === "development") return;
     if (inView && !viewCountedRef.current) {
       viewCountedRef.current = true;
       
@@ -308,6 +311,32 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
   }, [selectedPollOption, pollVotes, post.id]);
 
   const totalVotes = pollVotes.reduce((acc: number, curr: any) => acc + curr.votes, 0);
+  const isPostOwner = session?.user?.id === post.userId || session?.user?.id === post.user?.id;
+  const canAcceptAnswer = post.postType === "need_help" || post.postType === "bug";
+
+  const handleAcceptAnswer = useCallback(async (commentId: string) => {
+    if (isAcceptingAnswer) return;
+    const summary = window.prompt("Add a short solved summary (optional):", "") || "";
+    setIsAcceptingAnswer(true);
+    try {
+      const res = await fetch("/api/comments/accept", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          commentId,
+          postId: post.id,
+          summary: summary.trim() || undefined,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to accept answer");
+      setAcceptedAnswerId(commentId);
+      toast.success("Answer accepted");
+    } catch (error) {
+      toast.error("Failed to accept answer");
+    } finally {
+      setIsAcceptingAnswer(false);
+    }
+  }, [post.id, isAcceptingAnswer]);
 
   return (
     <motion.div
@@ -384,6 +413,10 @@ export default function PostItem({ post, onDelete }: PostItemProps) {
               onPostComment={handlePostComment}
               onDeleteComment={(id) => setComments((prev: any[]) => prev.filter(c => (c.id || c._id) !== id))}
               currentUserId={session?.user?.id}
+              isPostOwner={!!isPostOwner}
+              canAcceptAnswer={canAcceptAnswer}
+              acceptedAnswerId={acceptedAnswerId}
+              onAcceptAnswer={handleAcceptAnswer}
             />
           )}
         </AnimatePresence>
