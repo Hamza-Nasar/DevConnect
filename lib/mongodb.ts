@@ -9,11 +9,12 @@ if (!uri) {
 }
 
 const options = {
-  serverSelectionTimeoutMS: 30000, // 30 seconds
-  connectTimeoutMS: 30000, // 30 seconds
-  socketTimeoutMS: 45000, // 45 seconds
+  // Fail fast in production so requests don't look "stuck" for minutes.
+  serverSelectionTimeoutMS: 10000, // 10 seconds
+  connectTimeoutMS: 10000, // 10 seconds
+  socketTimeoutMS: 20000, // 20 seconds
   maxPoolSize: 10,
-  minPoolSize: 1,
+  minPoolSize: 0,
   maxIdleTimeMS: 30000,
   retryWrites: true,
   retryReads: true,

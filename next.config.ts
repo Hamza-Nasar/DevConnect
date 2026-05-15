@@ -10,9 +10,7 @@ const nextConfig: NextConfig = {
   // Force serverful deployment on Railway (not serverless)
   ...(process.env.RAILWAY_PROJECT_ID && {
     output: undefined, // Don't set output to 'standalone' or 'export'
-    experimental: {
-      serverComponentsExternalPackages: [],
-    },
+    serverExternalPackages: [],
   }),
   images: {
     ...(isCloudflareBuild ? { unoptimized: true } : {}),
