@@ -8,6 +8,8 @@ const socket_io_1 = require("socket.io");
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const jwt_1 = require("next-auth/jwt");
 const socket_server_1 = require("../lib/socket-server");
+const mongodb_1 = require("../lib/mongodb");
+const db_1 = require("../lib/db");
 const database_index_service_1 = require("../services/database-index.service");
 const user_service_1 = require("../services/user.service");
 const message_socket_1 = require("../sockets/message.socket");
@@ -35,8 +37,48 @@ function initializeSocket(server) {
         cookie: false,
     });
     (0, socket_server_1.setSocketInstance)(io);
+    startNeedHelpAutoBump(io);
     const userSockets = new Map();
     const userIdMapping = new Map();
+    const socketPresence = new Map();
+    const resolvePresence = (userId, oauthId) => {
+        const socketIds = new Set([...(userSockets.get(userId) || [])]);
+        if (oauthId && oauthId !== userId) {
+            for (const socketId of userSockets.get(oauthId) || [])
+                socketIds.add(socketId);
+        }
+        let hasAway = false;
+        let hasBusy = false;
+        for (const socketId of socketIds) {
+            const status = socketPresence.get(socketId) || "online";
+            if (status === "online")
+                return "online";
+            if (status === "busy")
+                hasBusy = true;
+            if (status === "away")
+                hasAway = true;
+        }
+        if (hasBusy)
+            return "busy";
+        if (hasAway)
+            return "away";
+        return "online";
+    };
+    const emitPresence = (userId, oauthId, lastSeen = null) => {
+        const status = resolvePresence(userId, oauthId);
+        io.emit("user_status", {
+            userId,
+            status,
+            lastSeen: status === "away" ? lastSeen || new Date().toISOString() : null,
+        });
+        if (oauthId && oauthId !== userId) {
+            io.emit("user_status", {
+                userId: oauthId,
+                status,
+                lastSeen: status === "away" ? lastSeen || new Date().toISOString() : null,
+            });
+        }
+    };
     const context = {
         io,
         userSockets,
@@ -68,6 +110,10 @@ function initializeSocket(server) {
             }
             return ids;
         },
+        updateUserPresence: (socket, status) => {
+            socketPresence.set(socket.id, status);
+            emitPresence(socket.userId, socket.oauthId);
+        },
         registerUserSocket: async (socket) => {
             var _a, _b;
             const user = await (0, user_service_1.markUserOnline)(socket.userId);
@@ -75,6 +121,7 @@ function initializeSocket(server) {
             const oauthId = (user === null || user === void 0 ? void 0 : user.id) || socket.oauthId;
             socket.userId = dbId;
             socket.oauthId = oauthId;
+            socketPresence.set(socket.id, "online");
             addSocketForUser(userSockets, dbId, socket.id);
             socket.join(`user:${dbId}`);
             if (oauthId && oauthId !== dbId) {
@@ -82,16 +129,14 @@ function initializeSocket(server) {
                 userIdMapping.set(dbId, oauthId);
                 socket.join(`user:${oauthId}`);
             }
-            io.emit("user_status", { userId: dbId, status: "online", lastSeen: null });
-            if (oauthId && oauthId !== dbId) {
-                io.emit("user_status", { userId: oauthId, status: "online", lastSeen: null });
-            }
+            emitPresence(dbId, oauthId);
             socket.emit("initial_online_users", context.getOnlineUserIds());
         },
         unregisterUserSocket: async (socket) => {
             var _a, _b;
             const dbId = socket.userId;
             const oauthId = socket.oauthId;
+            socketPresence.delete(socket.id);
             removeSocketForUser(userSockets, dbId, socket.id);
             if (oauthId && oauthId !== dbId) {
                 removeSocketForUser(userSockets, oauthId, socket.id);
@@ -150,7 +195,14 @@ async function authenticateSocket(socket) {
     if (!payload) {
         const bearerToken = extractBearerToken(socket);
         if (bearerToken) {
-            payload = jsonwebtoken_1.default.verify(bearerToken, secret);
+            payload = await parseSocketToken(bearerToken, secret);
+        }
+    }
+    // Fallback for Socket.IO handshakes where next-auth helpers cannot read token.
+    if (!payload) {
+        const cookieToken = extractSessionTokenFromCookies(socket);
+        if (cookieToken) {
+            payload = await parseSocketToken(cookieToken, secret);
         }
     }
     if (!payload)
@@ -179,6 +231,89 @@ function extractBearerToken(socket) {
         return authorization.slice("Bearer ".length).trim();
     }
     return null;
+}
+let needHelpBumpTimer = null;
+function startNeedHelpAutoBump(io) {
+    if (needHelpBumpTimer)
+        return;
+    needHelpBumpTimer = setInterval(async () => {
+        try {
+            const postsCollection = await (0, mongodb_1.getCollection)(db_1.COLLECTIONS.POSTS);
+            const threshold = new Date(Date.now() - 30 * 60 * 1000);
+            const nowIso = new Date().toISOString();
+            const result = await postsCollection.updateMany({
+                postType: "need_help",
+                createdAt: { $lt: threshold },
+                $and: [
+                    { $or: [{ "helpContext.status": "open" }, { "helpContext.status": { $exists: false } }] },
+                    {
+                        $or: [
+                            { "helpContext.lastBumpedAt": { $exists: false } },
+                            { "helpContext.lastBumpedAt": { $lt: threshold.toISOString() } },
+                        ],
+                    },
+                ],
+            }, {
+                $set: {
+                    "helpContext.lastBumpedAt": nowIso,
+                    updatedAt: new Date(),
+                },
+            });
+            if (result.modifiedCount > 0) {
+                io.emit("need_help_bumped", { bumped: result.modifiedCount, at: nowIso });
+            }
+        }
+        catch (error) {
+            console.error("[NeedHelp] auto-bump failed:", error);
+        }
+    }, 5 * 60 * 1000);
+}
+function extractSessionTokenFromCookies(socket) {
+    var _a, _b;
+    const cookieHeader = (_b = (_a = socket === null || socket === void 0 ? void 0 : socket.handshake) === null || _a === void 0 ? void 0 : _a.headers) === null || _b === void 0 ? void 0 : _b.cookie;
+    if (!cookieHeader || typeof cookieHeader !== "string")
+        return null;
+    const cookieMap = new Map();
+    cookieHeader.split(";").forEach((entry) => {
+        const trimmed = entry.trim();
+        const separatorIndex = trimmed.indexOf("=");
+        if (separatorIndex <= 0)
+            return;
+        const key = trimmed.slice(0, separatorIndex);
+        const value = trimmed.slice(separatorIndex + 1);
+        cookieMap.set(key, decodeURIComponent(value));
+    });
+    const baseNames = ["next-auth.session-token", "__Secure-next-auth.session-token"];
+    for (const baseName of baseNames) {
+        const direct = cookieMap.get(baseName);
+        if (direct)
+            return direct;
+        const chunks = Array.from(cookieMap.entries())
+            .filter(([key]) => key.startsWith(`${baseName}.`))
+            .sort((a, b) => {
+            const aIndex = Number(a[0].split(".").pop() || "0");
+            const bIndex = Number(b[0].split(".").pop() || "0");
+            return aIndex - bIndex;
+        })
+            .map(([, value]) => value);
+        if (chunks.length > 0)
+            return chunks.join("");
+    }
+    return null;
+}
+async function parseSocketToken(token, secret) {
+    try {
+        return jsonwebtoken_1.default.verify(token, secret);
+    }
+    catch (_a) {
+        try {
+            const decoded = await (0, jwt_1.decode)({ token, secret });
+            return decoded || null;
+        }
+        catch (_b) {
+            return null;
+        }
+    }
 }
 function addSocketForUser(userSockets, userId, socketId) {
     const socketIds = userSockets.get(userId) || new Set();

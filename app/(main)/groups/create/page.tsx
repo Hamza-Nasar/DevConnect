@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { Globe, Lock, Upload } from "lucide-react";
+import { Globe, Lock } from "lucide-react";
 import Navbar from "@/components/navbar/Navbar";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
 export default function CreateGroupPage() {
-    const { data: session } = useSession();
+    const { data: session, status } = useSession();
     const router = useRouter();
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
@@ -19,8 +19,17 @@ export default function CreateGroupPage() {
     const [avatar, setAvatar] = useState("");
     const [creating, setCreating] = useState(false);
 
+    useEffect(() => {
+        if (status === "unauthenticated") {
+            router.push("/login");
+        }
+    }, [status, router]);
+
+    if (status === "loading") {
+        return null;
+    }
+
     if (!session) {
-        router.push("/login");
         return null;
     }
 

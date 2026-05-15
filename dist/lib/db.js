@@ -175,11 +175,26 @@ async function createPost(postData) {
     const result = await collection.insertOne(Object.assign(Object.assign({}, postData), { createdAt: new Date(), updatedAt: new Date(), likesCount: 0, commentsCount: 0, sharesCount: 0, viewsCount: 0 }));
     return collection.findOne({ _id: result.insertedId });
 }
-async function findPosts(limit = 20, skip = 0) {
+async function findPosts(limit = 20, skip = 0, filter = "All") {
     const collection = await (0, mongodb_2.getCollection)(exports.COLLECTIONS.POSTS);
+    const normalizedFilter = (filter || "All").toLowerCase();
+    const query = {};
+    if (normalizedFilter === "photos") {
+        query.images = { $exists: true, $ne: [] };
+    }
+    else if (normalizedFilter === "videos") {
+        query.video = { $ne: null };
+    }
+    else if (normalizedFilter === "polls") {
+        query.postType = "poll";
+    }
+    else if (normalizedFilter === "need help") {
+        query.postType = "need_help";
+    }
     return collection
-        .find({})
+        .find(query)
         .sort({ createdAt: -1 })
+        .maxTimeMS(5000)
         .limit(limit)
         .skip(skip)
         .toArray();

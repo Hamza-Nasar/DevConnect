@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { Suspense, useState, useRef, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -21,7 +21,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ScrollReveal } from "@/components/animations/ScrollReveal";
 import getSocket from "@/lib/socket";
 
-export default function CreatePostPage() {
+function CreatePostContent() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -440,5 +440,13 @@ export default function CreatePostPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function CreatePostPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900" />}>
+      <CreatePostContent />
+    </Suspense>
   );
 }

@@ -81,11 +81,7 @@ function registerUserSocket(socket, context) {
         context.io.to(`user:${data.followingId}`).emit("unfollowed", { followerId: socket.userId });
     });
     socket.on("update_presence", (data) => {
-        context.io.emit("user_status", {
-            userId: socket.userId,
-            status: data.status === "away" ? "away" : "online",
-            lastSeen: data.status === "away" ? new Date().toISOString() : null,
-        });
+        context.updateUserPresence(socket, data.status);
     });
     socket.on("disconnect", async () => {
         await context.unregisterUserSocket(socket);
