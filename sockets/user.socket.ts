@@ -1,4 +1,5 @@
 import { createNotification } from "../services/notification.service";
+import { touchUserHeartbeat } from "../services/user.service";
 import type { AuthenticatedSocket, SocketContext } from "./types";
 
 export function registerUserSocket(socket: AuthenticatedSocket, context: SocketContext) {
@@ -7,6 +8,7 @@ export function registerUserSocket(socket: AuthenticatedSocket, context: SocketC
   socket.on("health_check_response", () => undefined);
 
   socket.on("ping_heartbeat", () => {
+    void touchUserHeartbeat(socket.userId).catch(() => undefined);
     socket.emit("pong_heartbeat");
   });
 

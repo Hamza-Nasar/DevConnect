@@ -77,10 +77,29 @@ export async function markUserOffline(userId: string, lastSeen = new Date()) {
   return user;
 }
 
+export async function touchUserHeartbeat(userId: string, seenAt = new Date()) {
+  const usersCollection = await getCollection(COLLECTIONS.USERS);
+  const user = await findUserByAnyId(userId);
+  if (!user) return null;
+
+  await usersCollection.updateOne(
+    { _id: user._id },
+    { $set: { isOnline: true, lastSeen: seenAt } }
+  );
+
+  return user;
+}
+
 export function publicUser(user: any) {
   if (!user) return null;
 
   const id = user._id?.toString?.() || user.id;
+  const lastSeenDate = user.lastSeen ? new Date(user.lastSeen) : null;
+  const freshnessWindowMs = 2 * 60 * 1000; // 2 minutes
+  const isFreshlyOnline =
+    Boolean(user.isOnline) &&
+    Boolean(lastSeenDate && Date.now() - lastSeenDate.getTime() <= freshnessWindowMs);
+
   return {
     id,
     name: user.name || null,
@@ -88,7 +107,7 @@ export function publicUser(user: any) {
     avatar: user.avatar || user.image || null,
     image: user.image || user.avatar || null,
     verified: user.verified || false,
-    status: user.isOnline ? "online" : "offline",
+    status: isFreshlyOnline ? "online" : "offline",
     lastSeen: user.lastSeen,
     alternativeIds: user.id && user.id !== id ? [user.id] : [],
   };

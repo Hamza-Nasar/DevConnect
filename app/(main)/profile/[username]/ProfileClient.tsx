@@ -192,6 +192,10 @@ export default function ProfileClient({
   const userName = user.name || "User";
   const badges = user.badges || [];
   const achievements = user.achievements || [];
+  const profileUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/profile/${user.username || user.id}`
+      : `/profile/${user.username || user.id}`;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
@@ -605,7 +609,7 @@ export default function ProfileClient({
       <QRCodeModal
         isOpen={showQRModal}
         onClose={() => setShowQRModal(false)}
-        profileUrl={`${window?.location?.origin}/profile/${user.username || user.id}`}
+        profileUrl={profileUrl}
         userName={user.name || user.username || "User"}
         userAvatar={user.avatar}
         onScan={() => setShowQRScanner(true)}
