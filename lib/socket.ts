@@ -20,7 +20,11 @@ export const getSocket = (): CustomSocket | null => {
 
   if (!socket) {
     const origin = window.location.origin.replace(/\/$/, "");
-    let socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || origin;
+    const configuredSocketUrl = process.env.NEXT_PUBLIC_SOCKET_URL?.trim();
+    const fallbackRailwayUrl =
+      process.env.NEXT_PUBLIC_RAILWAY_URL?.trim() ||
+      "https://devconnect-production-d794.up.railway.app";
+    let socketUrl = configuredSocketUrl || origin;
 
     // Environment detection using server-side variables (more reliable than hostname)
     const deploymentPlatform = process.env.DEPLOYMENT_PLATFORM || 'unknown';
@@ -48,10 +52,11 @@ export const getSocket = (): CustomSocket | null => {
       isProduction
     });
 
-    if (isProduction && finalIsVercel && !process.env.NEXT_PUBLIC_SOCKET_URL) {
-      console.error("❌ [Client] CRITICAL: Vercel deployment detected but NEXT_PUBLIC_SOCKET_URL is not set! Socket.io server cannot run on Vercel. Please set NEXT_PUBLIC_SOCKET_URL to your Railway backend URL in Vercel environment variables.");
-      // Don't initialize socket if we can't connect to the right server
-      return null;
+    if (isProduction && finalIsVercel && !configuredSocketUrl) {
+      console.warn(
+        "[Client] NEXT_PUBLIC_SOCKET_URL missing on Vercel. Falling back to Railway socket URL."
+      );
+      socketUrl = fallbackRailwayUrl;
     }
 
     // Ensure socketUrl has protocol
@@ -76,6 +81,14 @@ export const getSocket = (): CustomSocket | null => {
       timestamp: new Date().toISOString()
     });
 
+    const isCrossOrigin = (() => {
+      try {
+        return new URL(socketUrl).origin !== window.location.origin;
+      } catch {
+        return false;
+      }
+    })();
+
     socket = io(socketUrl, {
       path: "/socket.io",
       auth: {
@@ -87,7 +100,7 @@ export const getSocket = (): CustomSocket | null => {
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       timeout: 10000,
-      withCredentials: true, // Enable credentials for production
+      withCredentials: !isCrossOrigin,
       autoConnect: true,
       forceNew: false,
     }) as CustomSocket;
