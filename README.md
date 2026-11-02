@@ -243,7 +243,7 @@ Viewing for portfolio or evaluation only.
 ---
 
 📩 **Contact**: [hamzanasar144@gmail.com](mailto:hamzanasar144@gmail.com)
-🌐 **Portfolio**: [https://hamza-dev-blond.vercel.app/](https://hamza-dev-blond.vercel.app/)
+🌐 **Portfolio**: [https://hamza-dev-blond.vercel.app/](https://hamzanasar.com)
 
 ---
 
